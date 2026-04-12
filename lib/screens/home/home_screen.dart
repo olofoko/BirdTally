@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -242,6 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _handleSiteMenu(v, site, parentFolder),
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'addSession', child: Text('Ny session')),
+                PopupMenuItem(value: 'rename', child: Text('Ändra namn')),
                 PopupMenuItem(value: 'location', child: Text('Redigera plats')),
                 PopupMenuItem(value: 'move', child: Text('Flytta')),
                 PopupMenuItem(value: 'delete', child: Text('Ta bort')),
@@ -285,6 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onSelected: (v) => _handleSessionMenu(v, session, site),
           itemBuilder: (_) => const [
             PopupMenuItem(value: 'export', child: Text('Exportera')),
+            PopupMenuItem(value: 'rename', child: Text('Ändra namn')),
             PopupMenuItem(value: 'useAsTemplate', child: Text('Använd som mall')),
             PopupMenuItem(value: 'move', child: Text('Flytta')),
             PopupMenuItem(value: 'delete', child: Text('Ta bort')),
@@ -336,6 +339,8 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (action) {
       case 'addSession':
         await _createSessionInSite(site, parentFolder);
+      case 'rename':
+        await _renameSite(site, parentFolder);
       case 'location':
         await _editSiteLocation(site, parentFolder);
       case 'move':
@@ -354,6 +359,8 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (action) {
       case 'export':
         await _exportSession(context, session, site);
+      case 'rename':
+        await _renameSession(session, site);
       case 'useAsTemplate':
         await _createSessionFromTemplate(site, session);
       case 'move':
@@ -438,6 +445,38 @@ class _HomeScreenState extends State<HomeScreen> {
     // Root folders are in provider; sub-folders need parent reload.
     if (folder.parentFolderId != null) {
       await _reloadFolderChildren(folder.parentFolderId!);
+    }
+  }
+
+  Future<void> _renameSite(Site site, Folder? parentFolder) async {
+    final name = await _showNameDialog('Ändra namn',
+        hint: 'Lokalnamn', initial: site.name);
+    if (name == null || !mounted) return;
+    if (parentFolder == null) {
+      await context.read<HomeProvider>().renameSite(site, name);
+    } else {
+      await SessionDao.instance.updateSite(site.copyWith(name: name));
+      await _reloadFolderChildren(parentFolder.id!);
+    }
+  }
+
+  Future<void> _renameSession(Session session, Site? site) async {
+    final name = await _showNameDialog('Ändra namn',
+        hint: 'Listnamn', initial: session.name);
+    if (name == null || !mounted) return;
+    final updated =
+        session.copyWith(name: name, updatedAt: DateTime.now());
+    await SessionDao.instance.updateSession(updated);
+    if (!mounted) return;
+    if (site == null) {
+      await context.read<HomeProvider>().renameLooseSession(session, name);
+    } else {
+      setState(() {
+        final list = _sessionsBySite[site.id!] ?? [];
+        _sessionsBySite[site.id!] = [
+          for (final s in list) s.id == session.id ? updated : s
+        ];
+      });
     }
   }
 
@@ -732,7 +771,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final observations =
         await SessionDao.instance.getObservations(session.id!);
-    final nonZero = observations.where((o) => o.count > 0).toList();
+    final actObs =
+        await SessionDao.instance.getActivityObservations(session.id!);
+
+    // Include species with a main count OR with any sub-rows (stage/gender/activity).
+    final nonZero = observations.where((o) =>
+        o.count > 0 || (actObs[o.taxonId]?.any((a) => a.count > 0) ?? false),
+    ).toList();
 
     final taxonIds = nonZero.map((o) => o.taxonId).toList();
     final taxa = taxonIds.isEmpty
@@ -741,9 +786,6 @@ class _HomeScreenState extends State<HomeScreen> {
             for (final t in await TaxonDao.instance.getByIds(taxonIds))
               t.taxonId: t,
           };
-
-    final actObs =
-        await SessionDao.instance.getActivityObservations(session.id!);
 
     String? folderName;
     if (site?.folderId != null) {
@@ -763,7 +805,12 @@ class _HomeScreenState extends State<HomeScreen> {
         folderName: folderName,
         clipboardMode: true,
       );
-      await Share.share(csv, subject: 'BirdTally – $name');
+      await Clipboard.setData(ClipboardData(text: csv));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Kopierat till urklipp')),
+        );
+      }
     } else {
       final csv = ExportService.instance.buildCsv(
         session: session,

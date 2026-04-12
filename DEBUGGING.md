@@ -63,6 +63,28 @@ Hane, Hona, Honfärgad, I par
 
 ---
 
+## W3 — Individuella start- och sluttider per rad
+
+A per-session toggle: **"Använd global start- och sluttid"** (default) vs **"Använd individuella start- och sluttid"**.
+
+**Global mode (default):** all rows use the session-level start/end times — current behaviour.
+
+**Individual mode:**
+- Each main observation row and each sub-row (activity/stage/gender) gets its own `start_time`, automatically set to the moment the first +1 is recorded on that row.
+- `end_time` per row defaults to the session-level end time if not individually set.
+- Both can be overridden manually by tapping the row.
+- Exported per row in the `Startdatum / Starttid / Slutdatum / Sluttid` columns.
+
+**Implementation scope:**
+- DB migration v8: add `use_individual_times` to `sessions`; add `start_time`/`end_time` to `observations` and `activity_observations`.
+- `Session` model: new field `useIndividualTimes`.
+- `Observation` + `ActivityObservation` models: new `startTime`/`endTime` fields (nullable).
+- `TallyProvider.increment` / `_adjustActivity`: set `startTime = now` on first +1 (when count goes from 0 → 1).
+- Tally screen: toggle setting (gear icon or session options); per-row time display and tap-to-edit in individual mode.
+- Export service: use per-row times when individual mode is on, fall back to session times when null.
+
+---
+
 ## W1 — Per-observation custom GPS coordinates
 Each activity sub-row should optionally have its own SWEREF 99 TM coordinate (point + radius), overriding the session-level location in the CSV export.
 

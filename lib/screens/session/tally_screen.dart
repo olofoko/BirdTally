@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
@@ -85,13 +86,16 @@ class _TallyBodyState extends State<_TallyBody> {
 
     return Scaffold(
       appBar: AppBar(
-        title: GestureDetector(
-          onTap: () => _editTimes(context, provider, session),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(session.name),
-              Text(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: () => _renameSession(context, provider),
+              child: Text(session.name),
+            ),
+            GestureDetector(
+              onTap: () => _editTimes(context, provider, session),
+              child: Text(
                 endStr != null
                     ? '$dateStr  $startStr – $endStr'
                     : '$dateStr  $startStr',
@@ -100,8 +104,8 @@ class _TallyBodyState extends State<_TallyBody> {
                     .bodySmall
                     ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         actions: [
           if (!finished)
@@ -123,6 +127,41 @@ class _TallyBodyState extends State<_TallyBody> {
         child: const Icon(Icons.add),
       ),
     );
+  }
+
+  Future<void> _renameSession(
+      BuildContext context, TallyProvider provider) async {
+    final current = provider.session?.name ?? '';
+    final controller = TextEditingController(text: current);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ändra namn'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Listnamn'),
+          textCapitalization: TextCapitalization.sentences,
+          onSubmitted: (v) {
+            if (v.trim().isNotEmpty) Navigator.pop(ctx, v.trim());
+          },
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Avbryt')),
+          TextButton(
+            onPressed: () {
+              final v = controller.text.trim();
+              if (v.isNotEmpty) Navigator.pop(ctx, v);
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    if (name == null) return;
+    await provider.rename(name);
   }
 
   Future<void> _editTimes(
@@ -220,7 +259,14 @@ class _TallyBodyState extends State<_TallyBody> {
 
     final provider = context.read<TallyProvider>();
     final session = provider.session ?? widget.session;
-    final observations = provider.pinnedObservations.where((o) => o.count > 0).toList();
+
+    final actObs =
+        await SessionDao.instance.getActivityObservations(session.id!);
+
+    // Include species with a main count OR with any sub-rows (stage/gender/activity).
+    final observations = provider.pinnedObservations.where((o) =>
+        o.count > 0 || (actObs[o.taxonId]?.any((a) => a.count > 0) ?? false),
+    ).toList();
     final taxa = {
       for (final o in observations)
         if (provider.taxonFor(o.taxonId) != null) o.taxonId: provider.taxonFor(o.taxonId)!,
@@ -239,9 +285,6 @@ class _TallyBodyState extends State<_TallyBody> {
       }
     }
 
-    final actObs =
-        await SessionDao.instance.getActivityObservations(session.id!);
-
     if (!mounted) return;
 
     final name = ExportService.sanitizeFilename(session.name);
@@ -256,7 +299,12 @@ class _TallyBodyState extends State<_TallyBody> {
         folderName: folderName,
         clipboardMode: true,
       );
-      await Share.share(csv, subject: 'BirdTally – $name');
+      await Clipboard.setData(ClipboardData(text: csv));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Kopierat till urklipp')),
+        );
+      }
     } else {
       final csv = ExportService.instance.buildCsv(
         session: session,

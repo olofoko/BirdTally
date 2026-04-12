@@ -207,6 +207,13 @@ class TallyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> rename(String name) async {
+    final updated = _session!.copyWith(name: name, updatedAt: DateTime.now());
+    await SessionDao.instance.updateSession(updated);
+    _session = updated;
+    notifyListeners();
+  }
+
   Future<void> setStartTime(DateTime dt) async {
     final updated = _session!.copyWith(date: dt, updatedAt: DateTime.now());
     await SessionDao.instance.updateSession(updated);

@@ -87,6 +87,13 @@ class HomeProvider extends ChangeNotifier {
     return site;
   }
 
+  Future<void> renameSite(Site site, String name) async {
+    final updated = site.copyWith(name: name);
+    await SessionDao.instance.updateSite(updated);
+    _looseSites = [for (final s in _looseSites) s.id == site.id ? updated : s];
+    notifyListeners();
+  }
+
   Future<void> deleteLooseSite(int siteId) async {
     await SessionDao.instance.deleteSite(siteId);
     _looseSites = _looseSites.where((s) => s.id != siteId).toList();
@@ -105,6 +112,13 @@ class HomeProvider extends ChangeNotifier {
     _looseSessions = [..._looseSessions, session];
     notifyListeners();
     return session;
+  }
+
+  Future<void> renameLooseSession(Session session, String name) async {
+    final updated = session.copyWith(name: name, updatedAt: DateTime.now());
+    await SessionDao.instance.updateSession(updated);
+    _looseSessions = [for (final s in _looseSessions) s.id == session.id ? updated : s];
+    notifyListeners();
   }
 
   Future<void> deleteLooseSession(int sessionId) async {
