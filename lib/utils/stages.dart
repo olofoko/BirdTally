@@ -1,0 +1,32 @@
+const List<String> kStages = [
+  'ägg',
+  'pulli',
+  'adult',
+  '1K',
+  '1K+',
+  '2K',
+  '2K+',
+  '2K-',
+  '3K',
+  '3K+',
+  '3K-',
+  '4K',
+  '4K+',
+  '4K-',
+  '5K',
+  '5K+',
+  '5K-',
+  '6K',
+  '6K+',
+  '6K-',
+  '7K',
+  '7K+',
+  '7K-',
+];
+
+const List<String> kGenders = [
+  'Hane',
+  'Hona',
+  'Honfärgad',
+  'I par',
+];
