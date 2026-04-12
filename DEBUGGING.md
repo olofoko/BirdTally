@@ -45,21 +45,7 @@
         
 # Wish list (not yet implemented)
 
-## W2 — Ålder-Stadium and Kön as sub-row options
-
-Besides "Lägg till aktivitet", parent rows should also offer "Lägg till ålder-stadium" and "Lägg till kön". These create sub-rows just like activities do, each with their own counter.
-
-Sub-rows themselves (activity, ålder-stadium, kön) should also allow adding ålder-stadium and kön to that specific sub-row.
-
-**UI suggestion:** The tap options sheet should have a section header "Lägg till underrad" above the three choices (Aktivitet / Ålder-Stadium / Kön) to make clear these will create child rows.
-
-**Ålder-Stadium values (Stage_Birds from ap2_template_sv.xls):**
-ägg, pulli, adult, 1K, 1K+, 2K, 2K+, 2K-, 3K, 3K+, 3K-, 4K, 4K+, 4K-, 5K, 5K+, 5K-, 6K, 6K+, 6K-, 7K, 7K+, 7K-
-
-**Kön values (Gender_Birds from ap2_template_sv.xls):**
-Hane, Hona, Honfärgad, I par
-
-**Export:** maps to the "Ålder-Stadium" and "Kön" columns in the Artportalen CSV.
+## W2 — Ålder-Stadium and Kön as sub-row options (RESOLVED)
 
 ---
 

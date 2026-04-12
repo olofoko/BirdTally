@@ -164,26 +164,45 @@ class TallyProvider extends ChangeNotifier {
 
   /// Sets activity on an existing sub-row (merges if duplicate created).
   Future<void> setActivityOnSubRow(ActivityObservation ao, String activity) async {
+    final fresh = _freshSubRow(ao);
     final updated =
-        await SessionDao.instance.setSubRowProperties(ao, activity: activity);
-    _replaceSubRow(ao, updated);
+        await SessionDao.instance.setSubRowProperties(fresh, activity: activity);
+    _replaceSubRow(fresh, updated);
     notifyListeners();
   }
 
   /// Sets ålder-stadium on an existing sub-row (merges if duplicate created).
   Future<void> setStageOnSubRow(ActivityObservation ao, String stage) async {
+    final fresh = _freshSubRow(ao);
     final updated =
-        await SessionDao.instance.setSubRowProperties(ao, stage: stage);
-    _replaceSubRow(ao, updated);
+        await SessionDao.instance.setSubRowProperties(fresh, stage: stage);
+    _replaceSubRow(fresh, updated);
     notifyListeners();
   }
 
   /// Sets kön on an existing sub-row (merges if duplicate created).
   Future<void> setGenderOnSubRow(ActivityObservation ao, String gender) async {
+    final fresh = _freshSubRow(ao);
     final updated =
-        await SessionDao.instance.setSubRowProperties(ao, gender: gender);
-    _replaceSubRow(ao, updated);
+        await SessionDao.instance.setSubRowProperties(fresh, gender: gender);
+    _replaceSubRow(fresh, updated);
     notifyListeners();
+  }
+
+  /// Looks up the current in-memory version of [ao] so callers that hold a
+  /// stale closure reference (possibly with id=null) always operate on the
+  /// row that has the real DB id.
+  ActivityObservation _freshSubRow(ActivityObservation ao) {
+    final list = _activityObservations[ao.taxonId] ?? [];
+    if (ao.id != null) {
+      final byId = list.firstWhere((a) => a.id == ao.id, orElse: () => ao);
+      return byId;
+    }
+    // Closure captured a null-id row — look up by composite key.
+    return list.firstWhere(
+      (a) => a.activity == ao.activity && a.stage == ao.stage && a.gender == ao.gender,
+      orElse: () => ao,
+    );
   }
 
   void _replaceSubRow(ActivityObservation old, ActivityObservation updated) {
@@ -352,15 +371,21 @@ class TallyProvider extends ChangeNotifier {
     final saved = await SessionDao.instance.upsertActivityObservation(obs);
     final savedList = List<ActivityObservation>.from(
         _activityObservations[taxonId] ?? []);
-    final savedIdx = saved.id != null
+    // Try by id first; if not found (in-memory row still has null id), fall back
+    // to composite key so the real DB id gets written back into memory.
+    int savedIdx = saved.id != null
         ? savedList.indexWhere((a) => a.id == saved.id)
-        : savedList.indexWhere((a) =>
-            a.activity == saved.activity &&
-            a.stage == saved.stage &&
-            a.gender == saved.gender);
+        : -1;
+    if (savedIdx < 0) {
+      savedIdx = savedList.indexWhere((a) =>
+          a.activity == saved.activity &&
+          a.stage == saved.stage &&
+          a.gender == saved.gender);
+    }
     if (savedIdx >= 0) {
       savedList[savedIdx] = saved;
       _activityObservations[taxonId] = savedList;
+      notifyListeners(); // update UI so closures hold the real DB id
     }
   }
 }

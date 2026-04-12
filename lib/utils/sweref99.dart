@@ -17,7 +17,7 @@ class Sweref99 {
   static const double _e2 = _f * (2 - _f);
 
   // SWEREF 99 TM projection constants
-  static const double _k0 = 1.0;
+  static const double _k0 = 0.9996;
   static const double _lon0 = 15.0 * pi / 180.0; // central meridian in radians
   static const double _falseEasting = 500000.0;
   static const double _falseNorthing = 0.0;

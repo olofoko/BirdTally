@@ -52,7 +52,7 @@ class AppDatabase {
 
     return openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -73,6 +73,7 @@ class AppDatabase {
         id                  INTEGER PRIMARY KEY AUTOINCREMENT,
         folder_id           INTEGER REFERENCES folders(id) ON DELETE SET NULL,
         name                TEXT NOT NULL,
+        landskap            TEXT,
         sweref99_northing   REAL,
         sweref99_easting    REAL,
         radius_m            INTEGER,
@@ -166,6 +167,9 @@ class AppDatabase {
           'ALTER TABLE activity_observations_new RENAME TO activity_observations');
       await db.execute(
           'CREATE INDEX idx_act_obs_session ON activity_observations(session_id)');
+    }
+    if (oldVersion < 8) {
+      await db.execute('ALTER TABLE sites ADD COLUMN landskap TEXT');
     }
   }
 

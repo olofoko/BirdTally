@@ -241,14 +241,13 @@ class _TallyBodyState extends State<_TallyBody> {
           children: [
             ListTile(
               leading: const Icon(Icons.file_download_outlined),
-              title: const Text('Exportera med rubrikrad'),
+              title: const Text('Exportera som CSV'),
               subtitle: const Text('Komplett CSV-fil'),
               onTap: () => Navigator.pop(ctx, _ExportMode.full),
             ),
             ListTile(
               leading: const Icon(Icons.content_paste_outlined),
-              title: const Text('Kopiera som urklipp'),
-              subtitle: const Text('Utan rubrikrad — för import i Artportalen'),
+              title: const Text('Kopiera text'),
               onTap: () => Navigator.pop(ctx, _ExportMode.clipboard),
             ),
           ],
@@ -278,7 +277,9 @@ class _TallyBodyState extends State<_TallyBody> {
     if (session.siteId != null) {
       final sites = await SessionDao.instance.getSites();
       final match = sites.where((s) => s.id == session.siteId).firstOrNull;
-      siteName = match?.name;
+      siteName = match == null
+          ? null
+          : (match.landskap != null ? '${match.name}, ${match.landskap}' : match.name);
       if (match?.folderId != null) {
         final folders = await SessionDao.instance.getFolders();
         folderName = folders.firstWhere((f) => f.id == match!.folderId).name;

@@ -7,7 +7,7 @@ En fågelräknarapp gjord för att generera .csv:er för rapportering till Artpo
 - **Räkning i fält** – lägg till arter via sökning, tryck + för att räkna
 - **Aktiviteter, ålder-stadium och kön** – lägg till underrader per individ med aktivitet (t.ex. spel/sång), ålder-stadium (t.ex. 2K+) och kön (t.ex. Hona)
 - **Lokaler med GPS** – sätt koordinater via GPS eller välj punkt på karta (OpenStreetMap)
-- **Export till Artportalen** – exportera som CSV-fil redo att importera i Artportalen, eller kopiera som urklipp
+- **Export till Artportalen** – exportera som CSV-fil eller kopiera som text för import i Artportalen
 - **Koordinatsystem** – välj mellan SWEREF 99 TM och WGS84 i inställningarna
 - **Mappar och lokaler** – organisera dina besök i mappar och lokaler
 - **Sessionsmallar** – starta nytt besök baserat på en tidigare lista, med samma arter men räknare nollställda
@@ -22,9 +22,13 @@ Appen finns ännu inte i Google Play. För att installera:
 
 ## Export till Artportalen
 
-1. Tryck på de tre prickarna bredvid ett besök → **Exportera**
-2. Välj **Exportera med rubrikrad** för en komplett CSV-fil, eller **Kopiera som urklipp** för direktimport i Artportalen
+1. Tryck på delningsikonen inne i ett besök
+2. Välj **Exportera som CSV** för en komplett CSV-fil, eller **Kopiera text** för att kopiera till urklipp
 3. I Artportalen: välj Importera → välj koordinatformat (SWEREF 99 TM eller WGS84) → ladda upp filen
+
+### Notering om Lokal/Fyndplats
+
+Artportalen kräver att **Lokalnamn** (för fåglar) eller **Fyndplats** matchar en befintlig publik fyndplats, eller att en ny skapas manuellt i Artportalen innan import. Appen exporterar lokalnamnet med landskapsförkortning (t.ex. *Nabben, Sk*) vilket hjälper Artportalen att hitta rätt lokal, men en del manuellt arbete kan krävas vid import — framför allt om lokalen inte redan finns i Artportalens databas.
 
 ## Feedback och buggar
 

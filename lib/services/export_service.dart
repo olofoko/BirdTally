@@ -90,10 +90,8 @@ class ExportService {
     bool clipboardMode = false,
   }) {
     final buffer = StringBuffer();
-    if (!clipboardMode) {
-      buffer.write('\uFEFF'); // UTF-8 BOM — tells Excel/Artportalen to use UTF-8
-      buffer.writeln(_headers.join(_sep));
-    }
+    buffer.write('\uFEFF'); // UTF-8 BOM — tells Excel/Artportalen to use UTF-8
+    buffer.writeln(_headers.join(_sep));
 
     final startDate = _dateFormat.format(session.date);
     final startTime = _timeFormat.format(session.date);

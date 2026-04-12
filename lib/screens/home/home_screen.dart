@@ -17,6 +17,7 @@ import '../../models/site.dart';
 import '../../providers/home_provider.dart';
 import '../../services/app_settings.dart';
 import '../../services/export_service.dart';
+import '../../utils/landsskap.dart';
 import '../../widgets/location_dialog.dart';
 import '../../widgets/move_dialog.dart';
 import '../session/tally_screen.dart';
@@ -245,6 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 PopupMenuItem(value: 'addSession', child: Text('Ny session')),
                 PopupMenuItem(value: 'rename', child: Text('Ändra namn')),
                 PopupMenuItem(value: 'location', child: Text('Redigera plats')),
+                PopupMenuItem(value: 'landskap', child: Text('Landskap')),
                 PopupMenuItem(value: 'move', child: Text('Flytta')),
                 PopupMenuItem(value: 'delete', child: Text('Ta bort')),
               ],
@@ -343,6 +345,8 @@ class _HomeScreenState extends State<HomeScreen> {
         await _renameSite(site, parentFolder);
       case 'location':
         await _editSiteLocation(site, parentFolder);
+      case 'landskap':
+        await _editSiteLandskap(site, parentFolder);
       case 'move':
         await showMoveSiteDialog(context, site);
         if (mounted) context.read<HomeProvider>().load();
@@ -515,15 +519,19 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     final location = await showLocationDialog(context);
     if (location != null && mounted) {
-      final updated = site.copyWith(
+      site = site.copyWith(
         sweref99Northing: location.northing,
         sweref99Easting: location.easting,
         radiusMeters: location.radiusMeters,
         wgs84Lat: location.wgs84Lat,
         wgs84Lon: location.wgs84Lon,
       );
-      await SessionDao.instance.updateSite(updated);
-      site = updated;
+      await SessionDao.instance.updateSite(site);
+    }
+    if (!mounted) return;
+    final landskap = await showLandskapPicker(context);
+    if (landskap != null && landskap.isNotEmpty && mounted) {
+      await SessionDao.instance.updateSite(site.copyWith(landskap: landskap));
     }
     if (mounted) context.read<HomeProvider>().load();
   }
@@ -537,14 +545,19 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     final location = await showLocationDialog(context);
     if (location != null && mounted) {
-      final updated = site.copyWith(
+      site = site.copyWith(
         sweref99Northing: location.northing,
         sweref99Easting: location.easting,
         radiusMeters: location.radiusMeters,
         wgs84Lat: location.wgs84Lat,
         wgs84Lon: location.wgs84Lon,
       );
-      await SessionDao.instance.updateSite(updated);
+      await SessionDao.instance.updateSite(site);
+    }
+    if (!mounted) return;
+    final landskap = await showLandskapPicker(context);
+    if (landskap != null && landskap.isNotEmpty && mounted) {
+      await SessionDao.instance.updateSite(site.copyWith(landskap: landskap));
     }
     if (mounted) await _reloadFolderChildren(folder.id!);
   }
@@ -561,6 +574,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     await SessionDao.instance.updateSite(updated);
     // Refresh the list so the location indicator updates.
+    if (parentFolder != null && mounted) {
+      await _reloadFolderChildren(parentFolder.id!);
+    } else if (mounted) {
+      context.read<HomeProvider>().load();
+    }
+  }
+
+  Future<void> _editSiteLandskap(Site site, Folder? parentFolder) async {
+    final picked = await showLandskapPicker(context, current: site.landskap);
+    if (picked == null || !mounted) return;
+    final updated = site.copyWith(
+      landskap: picked.isEmpty ? null : picked,
+      clearLandskap: picked.isEmpty,
+    );
+    await SessionDao.instance.updateSite(updated);
     if (parentFolder != null && mounted) {
       await _reloadFolderChildren(parentFolder.id!);
     } else if (mounted) {
