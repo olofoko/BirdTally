@@ -1,0 +1,112 @@
+﻿Taxon id;Global sorteringsordning;Vetenskapligt namn;Svenskt namn;Kategori;Observationer;Landskapstyp;RedListCategory;Rödlistningskriterium
+100008;56919;Anser erythropus;fjällgås;Art;20911;Fjäll (F) - Stor betydelse, Jordbrukslandskap (J) - Stor betydelse, Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse;EN;D
+232125;56926;Anser fabalis;skogsgås;Art;32952;Jordbrukslandskap (J) - Stor betydelse, Skog (S) - Stor betydelse, Våtmark (V) - Stor betydelse;VU;C1
+102930;56973;Tadorna tadorna;gravand;Art;307820;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Marin miljö (M) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse, Sötvatten (L) - Har betydelse;NT;A2b
+102108;56981;Clangula hyemalis;alfågel;Art;164213;Brackvatten (B) - Stor betydelse, Fjäll (F) - Stor betydelse, Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse, Marin miljö (M) - Har betydelse;NT;A2abc
+232124;56982;Clangula hyemalis (wintering);alfågel (övervintrande population);Population;0;Brackvatten (B) - Stor betydelse, Marin miljö (M) - Har betydelse;VU;A2abce
+102935;56988;Somateria mollissima;ejder;Art;413227;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Marin miljö (M) - Stor betydelse;EN;A2abce
+102107;57025;Aythya ferina;brunand;Art;225821;Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse;EN;"A2abce; C1"
+100014;57031;Aythya marila;bergand;Art;121392;Brackvatten (B) - Stor betydelse, Fjäll (F) - Stor betydelse, Havsstrand (H) - Stor betydelse, Marin miljö (M) - Stor betydelse, Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse;VU;A2abce
+100007;57045;Spatula querquedula;årta;Art;117339;Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse;EN;C1
+102931;57055;Mareca penelope;bläsand;Art;593481;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse;NT;A2ab
+100006;57065;Anas acuta;stjärtand;Art;247042;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse;EN;C1
+102932;57066;Anas crecca;kricka;Art;792979;Brackvatten (B) - Stor betydelse, Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse, Fjäll (F) - Har betydelse, Havsstrand (H) - Har betydelse;NT;A2b
+100114;57155;Podiceps grisegena;gråhakedopping;Art;176957;Brackvatten (B) - Stor betydelse, Sötvatten (L) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse, Marin miljö (M) - Har betydelse;NT;A2abc
+100115;57160;Podiceps nigricollis;svarthalsad dopping;Art;12622;Sötvatten (L) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse;EN;D
+102972;57199;Streptopelia decaocto;turkduva;Art;191622;Urban miljö (U) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse;NT;A2abe
+100044;57226;Crex crex;kornknarr;Art;45645;Jordbrukslandskap (J) - Stor betydelse, Våtmark (V) - Har betydelse;EN;C1
+100116;57230;Porzana porzana;småfläckig sumphöna;Art;21136;Våtmark (V) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse;VU;D1
+102950;57256;Haematopus ostralegus;strandskata;Art;461161;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Marin miljö (M) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse, Urban miljö (U) - Har betydelse;NT;"A2b; C1"
+102952;57278;Vanellus vanellus;tofsvipa;Art;834683;Havsstrand (H) - Stor betydelse, Jordbrukslandskap (J) - Stor betydelse, Våtmark (V) - Stor betydelse, Brackvatten (B) - Har betydelse, Marin miljö (M) - Har betydelse;VU;A2b
+100091;57301;Numenius arquata;storspov;Art;481414;Jordbrukslandskap (J) - Stor betydelse, Våtmark (V) - Stor betydelse, Havsstrand (H) - Har betydelse, Marin miljö (M) - Har betydelse;EN;A2abce
+100075;57305;Limosa lapponica;myrspov;Art;161920;Brackvatten (B) - Stor betydelse, Fjäll (F) - Stor betydelse, Havsstrand (H) - Stor betydelse, Våtmark (V) - Stor betydelse, Marin miljö (M) - Har betydelse, Sötvatten (L) - Har betydelse;VU;D1
+100076;57308;Limosa limosa;rödspov;Art;62032;Havsstrand (H) - Stor betydelse, Jordbrukslandskap (J) - Stor betydelse, Våtmark (V) - Stor betydelse, Brackvatten (B) - Har betydelse, Marin miljö (M) - Har betydelse, Sötvatten (L) - Har betydelse;EN;"A2abce; C2a(i); D"
+102954;57325;Gallinago gallinago;enkelbeckasin;Art;513588;Skog (S) - Stor betydelse, Våtmark (V) - Stor betydelse, Fjäll (F) - Har betydelse, Havsstrand (H) - Har betydelse, Jordbrukslandskap (J) - Har betydelse;NT;A2ab
+102961;57330;Actitis hypoleucos;drillsnäppa;Art;364202;Havsstrand (H) - Stor betydelse, Våtmark (V) - Stor betydelse;NT;A2abce
+102617;57335;Phalaropus lobatus;smalnäbbad simsnäppa;Art;26490;Fjäll (F) - Stor betydelse, Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse, Brackvatten (B) - Har betydelse;VU;A2abc
+102957;57347;Tringa erythropus;svartsnäppa;Art;220077;Skog (S) - Stor betydelse, Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse, Brackvatten (B) - Har betydelse, Fjäll (F) - Har betydelse, Havsstrand (H) - Har betydelse, Marin miljö (M) - Har betydelse;NT;A2ab
+102115;57351;Arenaria interpres;roskarl;Art;82880;Havsstrand (H) - Stor betydelse;EN;A2abce
+100103;57358;Calidris pugnax;brushane;Art;371479;Fjäll (F) - Stor betydelse, Våtmark (V) - Stor betydelse, Brackvatten (B) - Har betydelse, Havsstrand (H) - Har betydelse, Jordbrukslandskap (J) - Har betydelse;VU;A2abc
+102114;57360;Calidris falcinellus;myrsnäppa;Art;35621;Våtmark (V) - Stor betydelse, Fjäll (F) - Har betydelse, Havsstrand (H) - Har betydelse;VU;A2ab
+102112;57366;Calidris temminckii;mosnäppa;Art;110775;Fjäll (F) - Stor betydelse, Våtmark (V) - Stor betydelse, Havsstrand (H) - Har betydelse;NT;A2b
+100023;57372;Calidris alpina schinzii;sydlig kärrsnäppa;Underart;4453;Havsstrand (H) - Stor betydelse, Våtmark (V) - Stor betydelse;CR;"A2ace; C1+2a(ii)"
+100132;57405;Stercorarius parasiticus;kustlabb;Art;84072;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Marin miljö (M) - Stor betydelse;VU;D1
+100133;57463;Sternula albifrons;småtärna;Art;82460;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Marin miljö (M) - Har betydelse, Urban miljö (U) - Har betydelse;EN;C1
+100134;57466;Hydroprogne caspia;skräntärna;Art;167348;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Sötvatten (L) - Stor betydelse;NT;D1
+100030;57474;Chlidonias niger;svarttärna;Art;76583;Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse;VU;D1
+100135;57477;Thalasseus sandvicensis;kentsk tärna;Art;133152;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Marin miljö (M) - Stor betydelse;NT;A3bc
+100125;57498;Rissa tridactyla;tretåig mås;Art;44916;Havsstrand (H) - Stor betydelse, Marin miljö (M) - Stor betydelse;EN;D
+102963;57507;Chroicocephalus ridibundus;skrattmås;Art;854133;Havsstrand (H) - Stor betydelse, Jordbrukslandskap (J) - Stor betydelse, Våtmark (V) - Stor betydelse, Brackvatten (B) - Har betydelse, Marin miljö (M) - Har betydelse, Sötvatten (L) - Har betydelse, Urban miljö (U) - Har betydelse;NT;A2abe
+102966;57524;Larus argentatus;gråtrut;Art;733166;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Marin miljö (M) - Stor betydelse, Urban miljö (U) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse, Sötvatten (L) - Har betydelse, Våtmark (V) - Har betydelse;VU;A2abcde
+102967;57530;Larus marinus;havstrut;Art;420234;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Marin miljö (M) - Stor betydelse, Urban miljö (U) - Har betydelse;EN;A2abc
+205660;57533;Larus fuscus;silltrut;Art;259068;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Marin miljö (M) - Stor betydelse, Sötvatten (L) - Har betydelse, Urban miljö (U) - Har betydelse;NT;A2ab
+100071;57536;Larus fuscus fuscus;östersjötrut;Underart;16698;Brackvatten (B) - Stor betydelse, Havsstrand (H) - Stor betydelse, Marin miljö (M) - Stor betydelse, Sötvatten (L) - Har betydelse, Urban miljö (U) - Har betydelse, Våtmark (V) - Har betydelse;NT;A2abc
+100031;57638;Ciconia ciconia;vit stork;Art;41038;Jordbrukslandskap (J) - Stor betydelse, Våtmark (V) - Stor betydelse, Urban miljö (U) - Har betydelse;EN;D
+205489;57654;Gulosus aristotelis;toppskarv;Art;45055;Havsstrand (H) - Stor betydelse, Marin miljö (M) - Stor betydelse;NT;B2a
+100018;57680;Botaurus stellaris;rördrom;Art;88571;Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse;NT;D1
+205497;57699;Ardea alba;ägretthäger;Art;117288;Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse, Brackvatten (B) - Har betydelse, Havsstrand (H) - Har betydelse, Skog (S) - Har betydelse;NT°;D1
+102976;57735;Apus apus;tornseglare;Art;420643;Urban miljö (U) - Stor betydelse, Våtmark (V) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse, Skog (S) - Har betydelse;VU;A2abc
+102622;57746;Aegolius funereus;pärluggla;Art;58790;Skog (S) - Stor betydelse;EN;A2abc
+102620;57752;Surnia ulula;hökuggla;Art;21173;Skog (S) - Stor betydelse, Våtmark (V) - Har betydelse;VU;C1
+102621;57755;Glaucidium passerinum;sparvuggla;Art;70524;Skog (S) - Stor betydelse;NT;A2ab
+102117;57761;Asio flammeus;jorduggla;Art;50472;Fjäll (F) - Stor betydelse, Jordbrukslandskap (J) - Stor betydelse, Våtmark (V) - Stor betydelse, Skog (S) - Har betydelse;NT;A2abc
+102975;57763;Asio otus;hornuggla;Art;85232;Jordbrukslandskap (J) - Stor betydelse, Skog (S) - Stor betydelse, Urban miljö (U) - Har betydelse, Våtmark (V) - Har betydelse;EN;A2ab
+100020;57767;Bubo bubo;berguv;Art;10006;Havsstrand (H) - Stor betydelse, Skog (S) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse, Urban miljö (U) - Har betydelse, Våtmark (V) - Har betydelse;VU;D1
+100136;57774;Strix nebulosa;lappuggla;Art;9149;Skog (S) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse, Våtmark (V) - Har betydelse;VU;D1
+100100;57799;Pernis apivorus;bivråk;Art;146954;Jordbrukslandskap (J) - Stor betydelse, Skog (S) - Stor betydelse, Våtmark (V) - Har betydelse;NT;A2abcde
+100011;57825;Aquila chrysaetos;kungsörn;Art;101271;Fjäll (F) - Stor betydelse, Skog (S) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse, Våtmark (V) - Har betydelse;NT;D1
+100001;57835;Astur gentilis;duvhök;Art;276701;Skog (S) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse, Urban miljö (U) - Har betydelse;NT;A2abc+3bc
+100034;57840;Circus cyaneus;blå kärrhök;Art;260847;Skog (S) - Stor betydelse, Våtmark (V) - Stor betydelse, Fjäll (F) - Har betydelse, Jordbrukslandskap (J) - Har betydelse;VU;D1
+100035;57842;Circus pygargus;ängshök;Art;36715;Jordbrukslandskap (J) - Stor betydelse, Våtmark (V) - Stor betydelse;EN;D
+103060;57853;Milvus migrans;brun glada;Art;33317;Jordbrukslandskap (J) - Stor betydelse, Skog (S) - Stor betydelse, Urban miljö (U) - Har betydelse, Våtmark (V) - Har betydelse;EN;D
+100004;57898;Alcedo atthis;kungsfiskare;Art;84619;Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse;NT°;D1
+102119;57903;Jynx torquilla;göktyta;Art;159885;Jordbrukslandskap (J) - Stor betydelse, Skog (S) - Stor betydelse, Urban miljö (U) - Har betydelse;NT;A2bc
+100109;57914;Picoides tridactylus;tretåig hackspett;Art;77725;Skog (S) - Stor betydelse;NT;C1
+100046;57920;Dendrocopos leucotos;vitryggig hackspett;Art;347;Skog (S) - Stor betydelse;CR;D
+100048;57927;Dryobates minor;mindre hackspett;Art;258476;Skog (S) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse, Urban miljö (U) - Har betydelse;NT;A2abc
+100054;57947;Falco peregrinus;pilgrimsfalk;Art;184292;Skog (S) - Stor betydelse, Våtmark (V) - Stor betydelse, Havsstrand (H) - Har betydelse, Jordbrukslandskap (J) - Har betydelse, Urban miljö (U) - Har betydelse;VU;A4abe
+100055;57950;Falco rusticolus;jaktfalk;Art;1790;Fjäll (F) - Stor betydelse;EN;D
+100094;57979;Oriolus oriolus;sommargylling;Art;16734;Skog (S) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse;EN;D
+103031;58018;Perisoreus infaustus;lavskrika;Art;55255;Skog (S) - Stor betydelse;NT;A2abce
+100090;58028;Nucifraga caryocatactes;nötkråka;Art;145473;Skog (S) - Stor betydelse, Urban miljö (U) - Stor betydelse;NT;A2abc
+232224;58030;Nucifraga caryocatactes caryocatactes;tjocknäbbad nötkråka;Underart;628;Skog (S) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse, Urban miljö (U) - Har betydelse;NT;A2abc
+100123;58052;Remiz pendulinus;pungmes;Art;15533;Våtmark (V) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse;CR;D
+103020;58071;Poecile palustris;entita;Art;405695;Skog (S) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse, Urban miljö (U) - Har betydelse;NT;A2abc
+103021;58073;Poecile montanus;talltita;Art;337503;Skog (S) - Stor betydelse;NT;A2abc
+103022;58075;Poecile cinctus;lappmes;Art;11764;Skog (S) - Stor betydelse;NT;A2abc
+100052;58099;Eremophila alpestris;berglärka;Art;11098;Fjäll (F) - Stor betydelse, Havsstrand (H) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse;EN;D
+103077;58136;Acrocephalus dumetorum;busksångare;Art;7033;Jordbrukslandskap (J) - Stor betydelse, Våtmark (V) - Stor betydelse, Urban miljö (U) - Har betydelse;NT°;D1
+103006;58138;Acrocephalus scirpaceus;rörsångare;Art;563231;Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse;NT;A2b
+100003;58142;Acrocephalus arundinaceus;trastsångare;Art;35675;Sötvatten (L) - Stor betydelse, Våtmark (V) - Stor betydelse;VU;D1
+102122;58154;Locustella fluviatilis;flodsångare;Art;12206;Våtmark (V) - Stor betydelse, Skog (S) - Har betydelse;NT°;"A2a; D1"
+103076;58155;Locustella luscinioides;vassångare;Art;7675;Våtmark (V) - Stor betydelse, Sötvatten (L) - Har betydelse;EN;D
+103003;58157;Locustella naevia;gräshoppsångare;Art;90744;Våtmark (V) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse;VU;C1
+100124;58162;Riparia riparia;backsvala;Art;175037;Urban miljö (U) - Stor betydelse, Våtmark (V) - Stor betydelse;EN;A2bc
+102980;58168;Hirundo rustica;ladusvala;Art;680977;Jordbrukslandskap (J) - Stor betydelse, Urban miljö (U) - Stor betydelse, Våtmark (V) - Stor betydelse;NT;A2ab
+102981;58171;Delichon urbicum;hussvala;Art;307770;Jordbrukslandskap (J) - Stor betydelse, Urban miljö (U) - Stor betydelse, Havsstrand (H) - Har betydelse;VU;A2bc
+103012;58197;Phylloscopus sibilatrix;grönsångare;Art;200283;Skog (S) - Stor betydelse;NT;A2ab
+100108;58220;Phylloscopus trochiloides;lundsångare;Art;7173;Skog (S) - Stor betydelse, Urban miljö (U) - Har betydelse;VU;D1
+100107;58222;Phylloscopus borealis;nordsångare;Art;703;Skog (S) - Stor betydelse;EN;D
+102123;58243;Curruca nisoria;höksångare;Art;22935;Jordbrukslandskap (J) - Stor betydelse, Skog (S) - Har betydelse;VU;"C1; D1"
+205866;58302;Certhia brachydactyla;trädgårdsträdkrypare;Art;861;Jordbrukslandskap (J) - Stor betydelse, Skog (S) - Stor betydelse, Urban miljö (U) - Stor betydelse;EN;D
+103037;58312;Sturnus vulgaris;stare;Art;904251;Jordbrukslandskap (J) - Stor betydelse, Skog (S) - Stor betydelse, Urban miljö (U) - Har betydelse, Våtmark (V) - Har betydelse;VU;A2abc
+103001;58347;Turdus iliacus;rödvingetrast;Art;447220;Skog (S) - Stor betydelse, Fjäll (F) - Har betydelse, Jordbrukslandskap (J) - Har betydelse;NT;A2abc
+102999;58352;Turdus pilaris;björktrast;Art;784884;Jordbrukslandskap (J) - Stor betydelse, Skog (S) - Stor betydelse, Fjäll (F) - Har betydelse, Urban miljö (U) - Har betydelse;NT;A2ab
+102624;58383;Luscinia svecica;blåhake;Art;135836;Fjäll (F) - Stor betydelse, Jordbrukslandskap (J) - Stor betydelse, Skog (S) - Stor betydelse, Våtmark (V) - Stor betydelse;NT;A2abc
+205952;58384;Luscinia svecica cyanecula;vitstjärnig blåhake;Underart;1272;Jordbrukslandskap (J) - Stor betydelse, Våtmark (V) - Stor betydelse, Sötvatten (L) - Har betydelse;EN;D
+233847;58385;Luscinia svecica svecica;rödstjärnig blåhake;Underart;1650;;NT;A2ab
+103074;58403;Tarsiger cyanurus;tajgablåstjärt;Art;642;Skog (S) - Stor betydelse;VU;D1
+102993;58408;Phoenicurus ochruros;svart rödstjärt;Art;85467;Urban miljö (U) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse;VU;D1
+233849;58431;Saxicola rubicola;svarthakad buskskvätta;Art;18177;Jordbrukslandskap (J) - Stor betydelse;NT°;D1
+102990;58456;Prunella modularis;järnsparv;Art;494387;Skog (S) - Stor betydelse;NT°;A2ab
+102987;58500;Motacilla alba;sädesärla;Art;884002;Jordbrukslandskap (J) - Stor betydelse, Urban miljö (U) - Stor betydelse, Våtmark (V) - Stor betydelse, Havsstrand (H) - Har betydelse, Sötvatten (L) - Har betydelse;NT;A2ab
+100010;58511;Anthus campestris;fältpiplärka;Art;8480;Havsstrand (H) - Stor betydelse, Jordbrukslandskap (J) - Stor betydelse, Urban miljö (U) - Har betydelse;CR;"A3bc; C1; D"
+102120;58518;Anthus cervinus;rödstrupig piplärka;Art;35618;Fjäll (F) - Stor betydelse, Våtmark (V) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse;EN;A2abc
+103051;58545;Carpodacus erythrinus;rosenfink;Art;131395;Jordbrukslandskap (J) - Stor betydelse, Våtmark (V) - Stor betydelse, Skog (S) - Har betydelse, Urban miljö (U) - Har betydelse;NT;A2abc
+103042;58561;Chloris chloris;grönfink;Art;1059959;Jordbrukslandskap (J) - Stor betydelse, Urban miljö (U) - Stor betydelse, Skog (S) - Har betydelse;VU;A2abe
+102124;58566;Linaria flavirostris;vinterhämpling;Art;111373;Fjäll (F) - Stor betydelse, Havsstrand (H) - Stor betydelse, Jordbrukslandskap (J) - Stor betydelse;NT°;D1
+100129;58593;Serinus serinus;gulhämpling;Art;10622;Skog (S) - Stor betydelse, Urban miljö (U) - Stor betydelse, Jordbrukslandskap (J) - Har betydelse;EN;D
+100050;58614;Emberiza pusilla;dvärgsparv;Art;2024;Skog (S) - Stor betydelse, Våtmark (V) - Har betydelse;VU;D1
+100081;58621;Emberiza calandra;kornsparv;Art;11293;Jordbrukslandskap (J) - Stor betydelse;EN;D
+102126;58630;Emberiza hortulana;ortolansparv;Art;29055;Jordbrukslandskap (J) - Stor betydelse, Skog (S) - Stor betydelse, Urban miljö (U) - Har betydelse;CR°;"A2abcd; C1"
+103055;58635;Emberiza citrinella;gulsparv;Art;769706;Jordbrukslandskap (J) - Stor betydelse, Skog (S) - Stor betydelse, Urban miljö (U) - Har betydelse;NT;A2ab
