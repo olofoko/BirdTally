@@ -61,15 +61,12 @@ class TallyProvider extends ChangeNotifier {
   /// Sum of own count + all activity sub-counts + all direct taxon children counts.
   int totalCountFor(int taxonId) {
     int total = countFor(taxonId);
-    // Add activity sub-counts for this taxon.
     for (final ao in (_activityObservations[taxonId] ?? <ActivityObservation>[])) {
       total += ao.count;
     }
-    // Add direct taxon children counts (underart etc.).
     for (final obs in _observations) {
       if (_taxa[obs.taxonId]?.parentTaxonId == taxonId) {
         total += obs.count;
-        // Also add activity counts for those children.
         for (final ao in (_activityObservations[obs.taxonId] ?? <ActivityObservation>[])) {
           total += ao.count;
         }
@@ -90,7 +87,6 @@ class TallyProvider extends ChangeNotifier {
     _activityObservations =
         await SessionDao.instance.getActivityObservations(session.id!);
 
-    // Collect all taxon IDs needed (observations + activity observations).
     final taxonIds = {
       ..._observations.map((o) => o.taxonId),
       ..._activityObservations.keys,
@@ -100,7 +96,6 @@ class TallyProvider extends ChangeNotifier {
       final taxa = await TaxonDao.instance.getByIds(taxonIds);
       _taxa = {for (final t in taxa) t.taxonId: t};
 
-      // Load parent taxa so child observations can show their parent row.
       final parentIds = taxa
           .where((t) => t.parentTaxonId != null)
           .map((t) => t.parentTaxonId!)
@@ -134,8 +129,6 @@ class TallyProvider extends ChangeNotifier {
     return _adjustActivity(ao, -1);
   }
 
-  /// Adds an activity sub-record for a taxon (creates it with count 1).
-  /// Also ensures the parent taxon is pinned.
   Future<void> addActivity(int taxonId, String activity) async {
     await _ensurePinned(taxonId);
     await _adjustActivity(
@@ -144,7 +137,6 @@ class TallyProvider extends ChangeNotifier {
         1);
   }
 
-  /// Adds a standalone ålder-stadium sub-row for a taxon.
   Future<void> addStage(int taxonId, String stage) async {
     await _ensurePinned(taxonId);
     await _adjustActivity(
@@ -153,7 +145,6 @@ class TallyProvider extends ChangeNotifier {
         1);
   }
 
-  /// Adds a standalone kön sub-row for a taxon.
   Future<void> addGender(int taxonId, String gender) async {
     await _ensurePinned(taxonId);
     await _adjustActivity(
@@ -162,7 +153,6 @@ class TallyProvider extends ChangeNotifier {
         1);
   }
 
-  /// Sets activity on an existing sub-row (merges if duplicate created).
   Future<void> setActivityOnSubRow(ActivityObservation ao, String activity) async {
     final fresh = _freshSubRow(ao);
     final updated =
@@ -171,7 +161,6 @@ class TallyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Sets ålder-stadium on an existing sub-row (merges if duplicate created).
   Future<void> setStageOnSubRow(ActivityObservation ao, String stage) async {
     final fresh = _freshSubRow(ao);
     final updated =
@@ -180,7 +169,6 @@ class TallyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Sets kön on an existing sub-row (merges if duplicate created).
   Future<void> setGenderOnSubRow(ActivityObservation ao, String gender) async {
     final fresh = _freshSubRow(ao);
     final updated =
@@ -198,7 +186,6 @@ class TallyProvider extends ChangeNotifier {
       final byId = list.firstWhere((a) => a.id == ao.id, orElse: () => ao);
       return byId;
     }
-    // Closure captured a null-id row — look up by composite key.
     return list.firstWhere(
       (a) => a.activity == ao.activity && a.stage == ao.stage && a.gender == ao.gender,
       orElse: () => ao,
@@ -208,13 +195,11 @@ class TallyProvider extends ChangeNotifier {
   void _replaceSubRow(ActivityObservation old, ActivityObservation updated) {
     final list =
         List<ActivityObservation>.from(_activityObservations[old.taxonId] ?? []);
-    // Remove the old row (and any that now match the updated id, in case of merge).
     list.removeWhere((a) => a.id == old.id || a.id == updated.id);
     list.add(updated);
     _activityObservations[old.taxonId] = list;
   }
 
-  /// Deletes a specific activity observation.
   Future<void> deleteActivityObservation(ActivityObservation obs) async {
     if (obs.id == null) return;
     await SessionDao.instance.deleteActivityObservation(obs.id!);
@@ -254,19 +239,16 @@ class TallyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Deletes a taxon's main observation and all its activity sub-records.
   Future<void> deleteObservation(int taxonId) async {
     final idx = _observations.indexWhere((o) => o.taxonId == taxonId);
     if (idx >= 0 && _observations[idx].id != null) {
       await SessionDao.instance.deleteObservation(_observations[idx].id!);
       _observations = List.of(_observations)..removeAt(idx);
     }
-    // Activity observations are deleted via DB cascade, clear locally too.
     _activityObservations.remove(taxonId);
     notifyListeners();
   }
 
-  /// Adds a taxon from the search panel: pins it and increments by 1.
   Future<void> addFromSearch(Taxon taxon) async {
     if (!_taxa.containsKey(taxon.taxonId)) {
       _taxa[taxon.taxonId] = taxon;
@@ -282,7 +264,6 @@ class TallyProvider extends ChangeNotifier {
   Future<void> _ensurePinned(int taxonId) async {
     final idx = _observations.indexWhere((o) => o.taxonId == taxonId);
     if (idx < 0) {
-      // No main observation yet — create a pinned one with count 0.
       final obs = Observation(
         sessionId: _session!.id!,
         taxonId: taxonId,
@@ -339,7 +320,6 @@ class TallyProvider extends ChangeNotifier {
     final list = List<ActivityObservation>.from(
         _activityObservations[taxonId] ?? []);
 
-    // Find by id if known, otherwise by composite key.
     final idx = template.id != null
         ? list.indexWhere((a) => a.id == template.id)
         : list.indexWhere((a) =>
@@ -371,8 +351,6 @@ class TallyProvider extends ChangeNotifier {
     final saved = await SessionDao.instance.upsertActivityObservation(obs);
     final savedList = List<ActivityObservation>.from(
         _activityObservations[taxonId] ?? []);
-    // Try by id first; if not found (in-memory row still has null id), fall back
-    // to composite key so the real DB id gets written back into memory.
     int savedIdx = saved.id != null
         ? savedList.indexWhere((a) => a.id == saved.id)
         : -1;
@@ -385,7 +363,7 @@ class TallyProvider extends ChangeNotifier {
     if (savedIdx >= 0) {
       savedList[savedIdx] = saved;
       _activityObservations[taxonId] = savedList;
-      notifyListeners(); // update UI so closures hold the real DB id
+      notifyListeners();
     }
   }
 }

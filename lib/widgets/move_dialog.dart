@@ -101,7 +101,7 @@ class _MoveSitePickerDialog extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.inbox_outlined),
-              title: const Text('Lös lista (ingen lokal)'),
+              title: const Text('Löst besök (ingen lokal)'),
               selected: currentSiteId == null,
               onTap: () => Navigator.pop(context, const _MoveTarget(null)),
             ),

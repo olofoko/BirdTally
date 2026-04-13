@@ -6,7 +6,6 @@ import '../../db/session_dao.dart';
 import '../../models/folder.dart';
 import '../../models/site.dart';
 import '../../providers/home_provider.dart';
-import '../../utils/landsskap.dart';
 import '../../widgets/location_dialog.dart';
 import '../../widgets/move_dialog.dart';
 import 'site_screen.dart';
@@ -182,13 +181,6 @@ class _FolderScreenState extends State<FolderScreen> {
         wgs84Lat: location.wgs84Lat,
         wgs84Lon: location.wgs84Lon,
       );
-      await SessionDao.instance.updateSite(site);
-    }
-
-    if (!mounted) return;
-    final landskap = await showLandskapPicker(context);
-    if (landskap != null && landskap.isNotEmpty && mounted) {
-      site = site.copyWith(landskap: landskap);
       await SessionDao.instance.updateSite(site);
     }
 

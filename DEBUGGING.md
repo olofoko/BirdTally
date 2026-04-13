@@ -40,10 +40,14 @@
     Sluttid: Not yet existing (RESOLVED)
     b. The exported file should be exported as .csv, not as plain text (RESOLVED)
     c. There could be an option for exporting as "urklipp". That should exclude the header row and just take the content with it (this is useful for Artoportalens import function) (RESOLVED)
-    d. The field "Huvudlokal" in the exported csv should be the name of the parent folder of the current lokal. If a lista isn't under a lokal, no lokal value should be given to the lista. (NOT YET IMPLEMENTED)
+    d. The field "Huvudlokal" in the exported csv should be the name of the parent folder of the current lokal. If a lista isn't under a lokal, no lokal value should be given to the lista. (REMOVED — too complex, not implementing)
 
         
 # Wish list (not yet implemented)
+
+## W4 - Bulk export and backup
+A per lokal and mapp export function - export all results as csv, preferable as a .zip-files with the folder tree intact. If not possible to export as a folder tree, the the naming of the files should follow the scheme "DateOfExport_MappName_LokalName_ListName.csv". If possible to export with folders, the export zip should be named "DateOfExport_MappName".
+There should also be an option in the main menu settings for a complete export - a backup of sorts - called "Backup - exportera all data", with the name of the .zip file being "DateOfBackup_BirdTally_Backup"
 
 ## W2 — Ålder-Stadium and Kön as sub-row options (RESOLVED)
 

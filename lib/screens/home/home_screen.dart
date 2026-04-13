@@ -16,8 +16,8 @@ import '../../models/session.dart';
 import '../../models/site.dart';
 import '../../providers/home_provider.dart';
 import '../../services/app_settings.dart';
+import '../../services/bulk_export_service.dart';
 import '../../services/export_service.dart';
-import '../../utils/landsskap.dart';
 import '../../widgets/location_dialog.dart';
 import '../../widgets/move_dialog.dart';
 import '../session/tally_screen.dart';
@@ -98,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Listor'),
+        title: const Text('Besök'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -127,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Text(
-            'Tryck på + för att skapa\nen mapp, lokal eller lista.',
+            'Tryck på + för att skapa\nen mapp, lokal eller besök.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -148,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
           for (final site in provider.looseSites) _buildSiteTile(site, 0, null),
         ],
         if (provider.looseSessions.isNotEmpty) ...[
-          _sectionHeader('Listor'),
+          _sectionHeader('Besök'),
           for (final session in provider.looseSessions)
             _buildSessionTile(session, 0, null),
         ],
@@ -192,6 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'addSite', child: Text('Ny lokal')),
                 PopupMenuItem(value: 'addSubFolder', child: Text('Ny undermapp')),
+                PopupMenuItem(value: 'export', child: Text('Exportera mapp')),
                 PopupMenuItem(value: 'move', child: Text('Flytta')),
                 PopupMenuItem(value: 'rename', child: Text('Byt namn')),
                 PopupMenuItem(value: 'delete', child: Text('Ta bort')),
@@ -243,10 +244,10 @@ class _HomeScreenState extends State<HomeScreen> {
               onSelected: (v) =>
                   _handleSiteMenu(v, site, parentFolder),
               itemBuilder: (_) => const [
-                PopupMenuItem(value: 'addSession', child: Text('Ny session')),
+                PopupMenuItem(value: 'addSession', child: Text('Nytt besök')),
+                PopupMenuItem(value: 'export', child: Text('Exportera lokal')),
                 PopupMenuItem(value: 'rename', child: Text('Ändra namn')),
                 PopupMenuItem(value: 'location', child: Text('Redigera plats')),
-                PopupMenuItem(value: 'landskap', child: Text('Landskap')),
                 PopupMenuItem(value: 'move', child: Text('Flytta')),
                 PopupMenuItem(value: 'delete', child: Text('Ta bort')),
               ],
@@ -326,6 +327,8 @@ class _HomeScreenState extends State<HomeScreen> {
         await _createSiteInFolder(folder);
       case 'addSubFolder':
         await _createSubFolder(folder);
+      case 'export':
+        await _exportFolder(folder);
       case 'move':
         await showMoveFolderDialog(context, folder);
         if (mounted) context.read<HomeProvider>().load();
@@ -341,12 +344,12 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (action) {
       case 'addSession':
         await _createSessionInSite(site, parentFolder);
+      case 'export':
+        await _exportSite(site, parentFolder);
       case 'rename':
         await _renameSite(site, parentFolder);
       case 'location':
         await _editSiteLocation(site, parentFolder);
-      case 'landskap':
-        await _editSiteLandskap(site, parentFolder);
       case 'move':
         await showMoveSiteDialog(context, site);
         if (mounted) context.read<HomeProvider>().load();
@@ -466,7 +469,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _renameSession(Session session, Site? site) async {
     final name = await _showNameDialog('Ändra namn',
-        hint: 'Listnamn', initial: session.name);
+        hint: 'Namn på besöket', initial: session.name);
     if (name == null || !mounted) return;
     final updated =
         session.copyWith(name: name, updatedAt: DateTime.now());
@@ -528,11 +531,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       await SessionDao.instance.updateSite(site);
     }
-    if (!mounted) return;
-    final landskap = await showLandskapPicker(context);
-    if (landskap != null && landskap.isNotEmpty && mounted) {
-      await SessionDao.instance.updateSite(site.copyWith(landskap: landskap));
-    }
     if (mounted) context.read<HomeProvider>().load();
   }
 
@@ -554,11 +552,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       await SessionDao.instance.updateSite(site);
     }
-    if (!mounted) return;
-    final landskap = await showLandskapPicker(context);
-    if (landskap != null && landskap.isNotEmpty && mounted) {
-      await SessionDao.instance.updateSite(site.copyWith(landskap: landskap));
-    }
     if (mounted) await _reloadFolderChildren(folder.id!);
   }
 
@@ -574,21 +567,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     await SessionDao.instance.updateSite(updated);
     // Refresh the list so the location indicator updates.
-    if (parentFolder != null && mounted) {
-      await _reloadFolderChildren(parentFolder.id!);
-    } else if (mounted) {
-      context.read<HomeProvider>().load();
-    }
-  }
-
-  Future<void> _editSiteLandskap(Site site, Folder? parentFolder) async {
-    final picked = await showLandskapPicker(context, current: site.landskap);
-    if (picked == null || !mounted) return;
-    final updated = site.copyWith(
-      landskap: picked.isEmpty ? null : picked,
-      clearLandskap: picked.isEmpty,
-    );
-    await SessionDao.instance.updateSite(updated);
     if (parentFolder != null && mounted) {
       await _reloadFolderChildren(parentFolder.id!);
     } else if (mounted) {
@@ -626,7 +604,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // ---------------------------------------------------------------------------
 
   Future<void> _createLooseSession() async {
-    final name = await _showNameDialog('Ny lista', hint: 'Namn på listan');
+    final name = await _showNameDialog('Nytt besök', hint: 'Namn på besöket');
     if (name == null || !mounted) return;
     final session =
         await context.read<HomeProvider>().createLooseSession(name);
@@ -644,12 +622,12 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.add_box_outlined),
-              title: const Text('Starta ny tom lista'),
+              title: const Text('Starta nytt tomt besök'),
               onTap: () => Navigator.pop(ctx, false),
             ),
             ListTile(
               leading: const Icon(Icons.copy_outlined),
-              title: const Text('Använd tidigare lista som mall'),
+              title: const Text('Använd tidigare besök som mall'),
               onTap: () => Navigator.pop(ctx, true),
             ),
           ],
@@ -665,7 +643,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       if (sessions.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Inga tidigare listor att använda som mall.')),
+          const SnackBar(content: Text('Inga tidigare besök att använda som mall.')),
         );
         return;
       }
@@ -770,6 +748,75 @@ class _HomeScreenState extends State<HomeScreen> {
   // Export
   // ---------------------------------------------------------------------------
 
+  Future<void> _exportFolder(Folder folder) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Förbereder export…'), duration: Duration(seconds: 30)),
+    );
+    try {
+      final path = await BulkExportService.instance.exportFolder(folder);
+      messenger.removeCurrentSnackBar();
+      if (mounted) {
+        await Share.shareXFiles(
+          [XFile(path, mimeType: 'application/zip')],
+          subject: 'BirdTally – ${folder.name}',
+        );
+      }
+    } catch (e) {
+      messenger.removeCurrentSnackBar();
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  Future<void> _exportSite(Site site, Folder? parentFolder) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Förbereder export…'), duration: Duration(seconds: 30)),
+    );
+    try {
+      final path = await BulkExportService.instance.exportSite(
+        site,
+        folderName: parentFolder?.name,
+      );
+      messenger.removeCurrentSnackBar();
+      if (mounted) {
+        await Share.shareXFiles(
+          [XFile(path, mimeType: 'application/zip')],
+          subject: 'BirdTally – ${site.name}',
+        );
+      }
+    } catch (e) {
+      messenger.removeCurrentSnackBar();
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  Future<void> _exportAll() async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Förbereder backup…'), duration: Duration(seconds: 30)),
+    );
+    try {
+      final path = await BulkExportService.instance.exportAll();
+      messenger.removeCurrentSnackBar();
+      if (mounted) {
+        await Share.shareXFiles(
+          [XFile(path, mimeType: 'application/zip')],
+          subject: 'BirdTally Backup',
+        );
+      }
+    } catch (e) {
+      messenger.removeCurrentSnackBar();
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
   Future<void> _exportSession(
       BuildContext context, Session session, Site? site) async {
     final siteName = site?.name;
@@ -781,14 +828,13 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.file_download_outlined),
-              title: const Text('Exportera med rubrikrad'),
+              title: const Text('Exportera som CSV'),
               subtitle: const Text('Komplett CSV-fil'),
               onTap: () => Navigator.pop(ctx, _ExportMode.full),
             ),
             ListTile(
               leading: const Icon(Icons.content_paste_outlined),
-              title: const Text('Kopiera som urklipp'),
-              subtitle: const Text('Utan rubrikrad — för import i Artportalen'),
+              title: const Text('Kopiera text'),
               onTap: () => Navigator.pop(ctx, _ExportMode.clipboard),
             ),
           ],
@@ -831,7 +877,6 @@ class _HomeScreenState extends State<HomeScreen> {
         activityObservations: actObs,
         siteName: siteName,
         folderName: folderName,
-        clipboardMode: true,
       );
       await Clipboard.setData(ClipboardData(text: csv));
       if (context.mounted) {
@@ -847,7 +892,6 @@ class _HomeScreenState extends State<HomeScreen> {
         activityObservations: actObs,
         siteName: siteName,
         folderName: folderName,
-        clipboardMode: false,
       );
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/$name.csv');
@@ -890,7 +934,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.list_alt_outlined),
-              title: const Text('Ny lista'),
+              title: const Text('Nytt besök'),
               onTap: () {
                 Navigator.pop(ctx);
                 _createLooseSession();
@@ -946,6 +990,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.backup_outlined),
+                  title: const Text('Backup – exportera all data'),
+                  subtitle: const Text('Alla besök som zip-fil'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _exportAll();
+                  },
                 ),
               ],
             );

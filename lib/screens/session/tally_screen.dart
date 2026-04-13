@@ -140,7 +140,7 @@ class _TallyBodyState extends State<_TallyBody> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Listnamn'),
+          decoration: const InputDecoration(hintText: 'Namn på besöket'),
           textCapitalization: TextCapitalization.sentences,
           onSubmitted: (v) {
             if (v.trim().isNotEmpty) Navigator.pop(ctx, v.trim());
@@ -277,9 +277,7 @@ class _TallyBodyState extends State<_TallyBody> {
     if (session.siteId != null) {
       final sites = await SessionDao.instance.getSites();
       final match = sites.where((s) => s.id == session.siteId).firstOrNull;
-      siteName = match == null
-          ? null
-          : (match.landskap != null ? '${match.name}, ${match.landskap}' : match.name);
+      siteName = match?.name;
       if (match?.folderId != null) {
         final folders = await SessionDao.instance.getFolders();
         folderName = folders.firstWhere((f) => f.id == match!.folderId).name;
@@ -298,7 +296,6 @@ class _TallyBodyState extends State<_TallyBody> {
         activityObservations: actObs,
         siteName: siteName,
         folderName: folderName,
-        clipboardMode: true,
       );
       await Clipboard.setData(ClipboardData(text: csv));
       if (mounted) {
@@ -314,7 +311,6 @@ class _TallyBodyState extends State<_TallyBody> {
         activityObservations: actObs,
         siteName: siteName,
         folderName: folderName,
-        clipboardMode: false,
       );
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/$name.csv');
@@ -508,7 +504,7 @@ class _TallyList extends StatelessWidget {
             const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.delete_outline),
-              title: const Text('Ta bort från lista'),
+              title: const Text('Ta bort från besök'),
               onTap: () {
                 Navigator.pop(ctx);
                 provider.deleteObservation(taxon.taxonId);

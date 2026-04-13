@@ -3,7 +3,6 @@ class Site {
   final int? id;
   final int? folderId; // null → Lösa lokaler
   final String name;
-  final String? landskap; // Swedish province abbreviation, e.g. 'Sk'
   final double? sweref99Northing;
   final double? sweref99Easting;
   final int? radiusMeters;
@@ -15,7 +14,6 @@ class Site {
     this.id,
     this.folderId,
     required this.name,
-    this.landskap,
     this.sweref99Northing,
     this.sweref99Easting,
     this.radiusMeters,
@@ -31,7 +29,6 @@ class Site {
       id: map['id'] as int?,
       folderId: map['folder_id'] as int?,
       name: map['name'] as String,
-      landskap: map['landskap'] as String?,
       sweref99Northing: map['sweref99_northing'] as double?,
       sweref99Easting: map['sweref99_easting'] as double?,
       radiusMeters: map['radius_m'] as int?,
@@ -45,7 +42,6 @@ class Site {
         if (id != null) 'id': id,
         'folder_id': folderId,
         'name': name,
-        'landskap': landskap,
         'sweref99_northing': sweref99Northing,
         'sweref99_easting': sweref99Easting,
         'radius_m': radiusMeters,
@@ -58,21 +54,18 @@ class Site {
     int? id,
     int? folderId,
     String? name,
-    String? landskap,
     double? sweref99Northing,
     double? sweref99Easting,
     int? radiusMeters,
     double? wgs84Lat,
     double? wgs84Lon,
     bool clearFolder = false,
-    bool clearLandskap = false,
     bool clearLocation = false,
   }) =>
       Site(
         id: id ?? this.id,
         folderId: clearFolder ? null : (folderId ?? this.folderId),
         name: name ?? this.name,
-        landskap: clearLandskap ? null : (landskap ?? this.landskap),
         sweref99Northing: clearLocation ? null : (sweref99Northing ?? this.sweref99Northing),
         sweref99Easting: clearLocation ? null : (sweref99Easting ?? this.sweref99Easting),
         radiusMeters: clearLocation ? null : (radiusMeters ?? this.radiusMeters),

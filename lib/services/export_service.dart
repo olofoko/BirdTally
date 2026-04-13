@@ -87,7 +87,6 @@ class ExportService {
     Map<int, List<ActivityObservation>> activityObservations = const {},
     String? siteName,
     String? folderName,
-    bool clipboardMode = false,
   }) {
     final buffer = StringBuffer();
     buffer.write('\uFEFF'); // UTF-8 BOM — tells Excel/Artportalen to use UTF-8
