@@ -9,7 +9,6 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../db/session_dao.dart';
 import '../../db/taxon_dao.dart';
-import '../../models/activity_observation.dart';
 import '../../models/folder.dart';
 import '../../models/observation.dart';
 import '../../models/session.dart';
@@ -330,8 +329,17 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'export':
         await _exportFolder(folder);
       case 'move':
-        await showMoveFolderDialog(context, folder);
-        if (mounted) context.read<HomeProvider>().load();
+        final (folderMoved, newParentId) = await showMoveFolderDialog(context, folder);
+        if (!mounted || !folderMoved) return;
+        // Reload source parent's sub-folder list (removes the folder from there).
+        if (folder.parentFolderId != null &&
+            _subFoldersByFolder.containsKey(folder.parentFolderId)) {
+          await _reloadFolderChildren(folder.parentFolderId!);
+        }
+        // Reload destination parent's sub-folder list (adds the folder there).
+        if (newParentId != null && _subFoldersByFolder.containsKey(newParentId)) {
+          await _reloadFolderChildren(newParentId);
+        }
       case 'rename':
         await _renameFolder(folder);
       case 'delete':
@@ -351,10 +359,13 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'location':
         await _editSiteLocation(site, parentFolder);
       case 'move':
-        await showMoveSiteDialog(context, site);
-        if (mounted) context.read<HomeProvider>().load();
-        if (parentFolder != null && mounted) {
-          await _reloadFolderChildren(parentFolder.id!);
+        final (siteMoved, newFolderId) = await showMoveSiteDialog(context, site);
+        if (!mounted || !siteMoved) return;
+        // Reload source folder's site list (removes the site from there).
+        if (parentFolder != null) await _reloadFolderChildren(parentFolder.id!);
+        // Reload destination folder's site list (adds the site there).
+        if (newFolderId != null && _sitesByFolder.containsKey(newFolderId)) {
+          await _reloadFolderChildren(newFolderId);
         }
       case 'delete':
         await _confirmDeleteSite(site, parentFolder);
@@ -371,9 +382,14 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'useAsTemplate':
         await _createSessionFromTemplate(site, session);
       case 'move':
-        await showMoveSessionDialog(context, session);
-        if (mounted) context.read<HomeProvider>().load();
-        if (site != null && mounted) await _reloadSiteChildren(site.id!);
+        final (sessionMoved, newSiteId) = await showMoveSessionDialog(context, session);
+        if (!mounted || !sessionMoved) return;
+        // Reload source site's session list (removes the session from there).
+        if (site != null) await _reloadSiteChildren(site.id!);
+        // Reload destination site's session list (adds the session there).
+        if (newSiteId != null && _sessionsBySite.containsKey(newSiteId)) {
+          await _reloadSiteChildren(newSiteId);
+        }
       case 'delete':
         await _confirmDeleteSession(session, site);
     }
@@ -394,9 +410,8 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => _sessionsBySite[site.id!] = [session, ...existing]);
       _openSession(session, site);
     } else {
-      // Loose session — copy species rows but no site
+      // Loose session — copy pinned species rows only, no sub-rows.
       final observations = await SessionDao.instance.getObservations(template.id!);
-      final actObsMap = await SessionDao.instance.getActivityObservations(template.id!);
       final now = DateTime.now();
       final session = await SessionDao.instance.insertSession(Session(
         name: name,
@@ -408,11 +423,6 @@ class _HomeScreenState extends State<HomeScreen> {
         await SessionDao.instance.upsertObservation(
           Observation(sessionId: session.id!, taxonId: obs.taxonId, count: 0, isPinned: true),
         );
-        for (final ao in actObsMap[obs.taxonId] ?? []) {
-          await SessionDao.instance.upsertActivityObservation(
-            ActivityObservation(sessionId: session.id!, taxonId: ao.taxonId, activity: ao.activity, count: 0),
-          );
-        }
       }
       if (!mounted) return;
       context.read<HomeProvider>().load();
@@ -919,6 +929,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.folder_outlined),
               title: const Text('Ny mapp'),
+              subtitle: const Text('Samla flera lokaler, t.ex. ett område eller ett län.'),
               onTap: () {
                 Navigator.pop(ctx);
                 _createFolder();
@@ -927,6 +938,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.place_outlined),
               title: const Text('Ny lokal'),
+              subtitle: const Text('En plats du återbesöker. Sparar GPS och underlättar mall för nya besök.'),
               onTap: () {
                 Navigator.pop(ctx);
                 _createLooseSite();
@@ -935,6 +947,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.list_alt_outlined),
               title: const Text('Nytt besök'),
+              subtitle: const Text('En räkning vid en viss tid. Kan ligga fritt eller under en lokal.'),
               onTap: () {
                 Navigator.pop(ctx);
                 _createLooseSession();

@@ -88,10 +88,14 @@ class _TallyBodyState extends State<_TallyBody> {
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             GestureDetector(
               onTap: () => _renameSession(context, provider),
-              child: Text(session.name),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(session.name),
+              ),
             ),
             GestureDetector(
               onTap: () => _editTimes(context, provider, session),
@@ -457,6 +461,37 @@ class _TallyList extends StatelessWidget {
     return items;
   }
 
+  void _showSubRowInfo(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Om underrader'),
+        content: const SingleChildScrollView(
+          child: Text(
+            'En underrad är en individ eller en grupp individer av samma art '
+            'med gemensamma egenskaper. En och samma underrad kan ha både '
+            'aktivitet, kön och ålder bestämt samtidigt — t.ex. "sjungande '
+            'hane, adult".\n\n'
+            'Antalet på underraden räknas in i artens totalsumma. Vill du '
+            'registrera samma art med olika egenskaper lägger du till en '
+            'underrad per kombination.\n\n'
+            'Exempel: 3 koltrastar som sjunger + 2 som födosöker = två '
+            'underrader, totalt 5 koltrastar.\n\n'
+            'Obs: Om du lägger aktivitet, kön och ålder som tre separata '
+            'underrader räknas de som tre olika individer. Lägg dem på '
+            'samma underrad om det gäller samma individ(er).',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showTaxonOptions(
       BuildContext context, TallyProvider provider, Taxon taxon) {
     showModalBottomSheet(
@@ -467,14 +502,33 @@ class _TallyList extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Lägg till underrad',
-                  style: Theme.of(ctx).textTheme.labelLarge?.copyWith(
-                        color: Theme.of(ctx).colorScheme.primary,
-                      ),
-                ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Lägg till underrad',
+                      style: Theme.of(ctx).textTheme.labelLarge?.copyWith(
+                            color: Theme.of(ctx).colorScheme.primary,
+                          ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.help_outline, size: 20),
+                    tooltip: 'Om underrader',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => _showSubRowInfo(ctx),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Varje underrad räknas som minst en egen individ med valda egenskaper. Huvudraden visar totalsumman.',
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
               ),
             ),
             ListTile(
@@ -581,7 +635,21 @@ class _TallyList extends StatelessWidget {
       title: 'Välj aktivitet',
       values: kActivities,
       isAlreadyAdded: (v) => existing.contains(v),
-      onSelected: (v) => provider.addActivity(taxon.taxonId, v),
+      onSelected: (v) async {
+        await provider.addActivity(taxon.taxonId, v);
+        if (context.mounted) _maybeShowSubRowSnackbar(context, provider);
+      },
+    );
+  }
+
+  void _maybeShowSubRowSnackbar(BuildContext context, TallyProvider provider) {
+    if (provider.subRowHintShown) return;
+    provider.markSubRowHintShown();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Underraden räknas som 1 individ. Tryck + för fler.'),
+        duration: Duration(seconds: 4),
+      ),
     );
   }
 
@@ -603,11 +671,12 @@ class _TallyList extends StatelessWidget {
       title: 'Välj ålder-stadium',
       values: kStages,
       isAlreadyAdded: (_) => false,
-      onSelected: (v) {
+      onSelected: (v) async {
         if (ao != null) {
-          provider.setStageOnSubRow(ao, v);
+          await provider.setStageOnSubRow(ao, v);
         } else {
-          provider.addStage(taxon!.taxonId, v);
+          await provider.addStage(taxon!.taxonId, v);
+          if (context.mounted) _maybeShowSubRowSnackbar(context, provider);
         }
       },
     );
@@ -620,11 +689,12 @@ class _TallyList extends StatelessWidget {
       title: 'Välj kön',
       values: kGenders,
       isAlreadyAdded: (_) => false,
-      onSelected: (v) {
+      onSelected: (v) async {
         if (ao != null) {
-          provider.setGenderOnSubRow(ao, v);
+          await provider.setGenderOnSubRow(ao, v);
         } else {
-          provider.addGender(taxon!.taxonId, v);
+          await provider.addGender(taxon!.taxonId, v);
+          if (context.mounted) _maybeShowSubRowSnackbar(context, provider);
         }
       },
     );
@@ -693,7 +763,7 @@ class _TallyItem {
 // Activity sub-row
 // ---------------------------------------------------------------------------
 
-class _ActivityRow extends StatelessWidget {
+class _ActivityRow extends StatefulWidget {
   final ActivityObservation ao;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
@@ -709,64 +779,100 @@ class _ActivityRow extends StatelessWidget {
   });
 
   @override
+  State<_ActivityRow> createState() => _ActivityRowState();
+}
+
+class _ActivityRowState extends State<_ActivityRow> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final ao = widget.ao;
     final theme = Theme.of(context);
+    final labelStyle = theme.textTheme.bodyMedium?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      fontStyle: FontStyle.italic,
+    );
     return Padding(
       padding: const EdgeInsets.only(left: 32),
-      child: SizedBox(
-        height: 48,
-        child: Row(
-          children: [
-            const SizedBox(width: 20),
-            Expanded(
-              child: GestureDetector(
-                onTap: onTap,
-                child: Text(
-                  ao.label.isEmpty ? '—' : ao.label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontStyle: FontStyle.italic,
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 150),
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(width: 20),
+              Expanded(
+                child: GestureDetector(
+                  onTap: widget.onTap,
+                  onLongPress: () => setState(() => _expanded = !_expanded),
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          ao.label.isEmpty ? '—' : ao.label,
+                          style: labelStyle,
+                          maxLines: _expanded ? null : 1,
+                          overflow: _expanded
+                              ? TextOverflow.visible
+                              : TextOverflow.ellipsis,
+                        ),
+                        if (ao.count == 0)
+                          Text(
+                            'Tryck + för att räkna',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.6),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close, size: 16),
-              onPressed: onDelete,
-              tooltip: 'Ta bort underrad',
-              padding: EdgeInsets.zero,
-            ),
-            SizedBox(
-              width: 40,
-              child: IconButton(
-                onPressed: ao.count > 0 ? onDecrement : null,
-                icon: const Icon(Icons.remove, size: 18),
+              IconButton(
+                icon: const Icon(Icons.close, size: 16),
+                onPressed: widget.onDelete,
+                tooltip: 'Ta bort underrad',
                 padding: EdgeInsets.zero,
               ),
-            ),
-            SizedBox(
-              width: 36,
-              child: Text(
-                '${ao.count}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: [FontFeature.tabularFigures()],
+              SizedBox(
+                width: 40,
+                child: IconButton(
+                  onPressed: ao.count > 0 ? widget.onDecrement : null,
+                  icon: const Icon(Icons.remove, size: 18),
+                  padding: EdgeInsets.zero,
                 ),
               ),
-            ),
-            SizedBox(
-              width: 40,
-              child: IconButton(
-                onPressed: onIncrement,
-                icon: const Icon(Icons.add, size: 18),
-                padding: EdgeInsets.zero,
+              SizedBox(
+                width: 36,
+                child: Text(
+                  '${ao.count}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
               ),
-            ),
-          ],
+              SizedBox(
+                width: 40,
+                child: IconButton(
+                  onPressed: widget.onIncrement,
+                  icon: const Icon(Icons.add, size: 18),
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

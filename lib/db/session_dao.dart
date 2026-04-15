@@ -316,7 +316,6 @@ class SessionDao {
 
     // Fetch template observations and activity observations.
     final observations = await getObservations(template.id!);
-    final activityObsMap = await getActivityObservations(template.id!);
 
     late Session newSession;
 
@@ -342,14 +341,8 @@ class SessionDao {
           'count': 0,
           'is_pinned': 1,
         });
-        for (final ao in activityObsMap[obs.taxonId] ?? []) {
-          await txn.insert('activity_observations', {
-            'session_id': sessionId,
-            'taxon_id': ao.taxonId,
-            'activity': ao.activity,
-            'count': 0,
-          });
-        }
+        // Activity sub-rows are intentionally not copied — a new session
+        // starts clean with only the pinned species list.
       }
 
       newSession = Session(

@@ -8,11 +8,13 @@ import '../models/site.dart';
 import '../providers/home_provider.dart';
 
 /// Shows a dialog to move [session] to a different site (or make it loose).
-Future<void> showMoveSessionDialog(BuildContext context, Session session) async {
+/// Returns `(true, newSiteId)` if the move was performed, `(false, null)` if cancelled.
+/// [newSiteId] is null when the session was moved to "loose" (no site).
+Future<(bool, int?)> showMoveSessionDialog(BuildContext context, Session session) async {
   final provider = context.read<HomeProvider>();
   final sites = await provider.getAllSites();
 
-  if (!context.mounted) return;
+  if (!context.mounted) return (false, null);
 
   final destination = await showDialog<_MoveTarget>(
     context: context,
@@ -22,18 +24,21 @@ Future<void> showMoveSessionDialog(BuildContext context, Session session) async 
     ),
   );
 
-  if (destination == null || !context.mounted) return;
+  if (destination == null || !context.mounted) return (false, null);
   await provider.moveSession(session, destination.id);
+  return (true, destination.id);
 }
 
 /// Shows a dialog to move [folder] to a different parent folder (or make it root).
 /// Excludes the folder itself and all its descendants to prevent circular moves.
-Future<void> showMoveFolderDialog(BuildContext context, Folder folder) async {
+/// Returns `(true, newParentId)` if the move was performed, `(false, null)` if cancelled.
+/// [newParentId] is null when the folder was moved to root level.
+Future<(bool, int?)> showMoveFolderDialog(BuildContext context, Folder folder) async {
   final provider = context.read<HomeProvider>();
   final allFolders = await provider.getAllFolders();
   final descendants = await SessionDao.instance.getDescendantFolderIds(folder.id!);
 
-  if (!context.mounted) return;
+  if (!context.mounted) return (false, null);
 
   // Exclude the folder itself and its descendants from choices.
   final eligible = allFolders
@@ -50,16 +55,19 @@ Future<void> showMoveFolderDialog(BuildContext context, Folder folder) async {
     ),
   );
 
-  if (destination == null || !context.mounted) return;
+  if (destination == null || !context.mounted) return (false, null);
   await provider.moveFolder(folder, destination.id);
+  return (true, destination.id);
 }
 
 /// Shows a dialog to move [site] to a different folder (or make it loose).
-Future<void> showMoveSiteDialog(BuildContext context, Site site) async {
+/// Returns `(true, newFolderId)` if the move was performed, `(false, null)` if cancelled.
+/// [newFolderId] is null when the site was moved to "loose" (no folder).
+Future<(bool, int?)> showMoveSiteDialog(BuildContext context, Site site) async {
   final provider = context.read<HomeProvider>();
   final folders = await provider.getAllFolders();
 
-  if (!context.mounted) return;
+  if (!context.mounted) return (false, null);
 
   final destination = await showDialog<_MoveTarget>(
     context: context,
@@ -69,8 +77,9 @@ Future<void> showMoveSiteDialog(BuildContext context, Site site) async {
     ),
   );
 
-  if (destination == null || !context.mounted) return;
+  if (destination == null || !context.mounted) return (false, null);
   await provider.moveSite(site, destination.id);
+  return (true, destination.id);
 }
 
 // ---------------------------------------------------------------------------

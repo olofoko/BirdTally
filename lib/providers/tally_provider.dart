@@ -17,9 +17,15 @@ class TallyProvider extends ChangeNotifier {
   Map<int, List<ActivityObservation>> _activityObservations = {};
   Map<int, Taxon> _taxa = {};
   bool _loading = true;
+  bool _subRowHintShown = false;
 
   Session? get session => _session;
   bool get loading => _loading;
+  bool get subRowHintShown => _subRowHintShown;
+
+  void markSubRowHintShown() {
+    _subRowHintShown = true;
+  }
 
   /// Observations that are pinned (shown in Aktuell lista), sorted by sort_order.
   List<Observation> get pinnedObservations {
@@ -81,6 +87,7 @@ class TallyProvider extends ChangeNotifier {
     _observations = [];
     _activityObservations = {};
     _taxa = {};
+    _subRowHintShown = false;
     notifyListeners();
 
     _observations = await SessionDao.instance.getObservations(session.id!);
