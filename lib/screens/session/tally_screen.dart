@@ -18,7 +18,7 @@ import '../../utils/activities.dart';
 import '../../utils/stages.dart';
 import '../../utils/string_utils.dart';
 import '../../widgets/badge_chips.dart';
-import '../../widgets/observation_row.dart';
+import '../../widgets/observation_row.dart' show ObservationRow, TallyCounter;
 
 /// Entry point: scopes TallyProvider and SearchProvider to this screen.
 class TallyScreen extends StatelessWidget {
@@ -112,6 +112,17 @@ class _TallyBodyState extends State<_TallyBody> {
           ],
         ),
         actions: [
+          PopupMenuButton<SortMode>(
+            icon: const Icon(Icons.sort),
+            tooltip: 'Sortering',
+            onSelected: (mode) => provider.setSortMode(mode),
+            itemBuilder: (_) => [
+              _sortMenuItem(SortMode.taxonomic, 'Taxonomisk ordning', provider),
+              _sortMenuItem(SortMode.alphabetic, 'Alfabetisk', provider),
+              _sortMenuItem(SortMode.byCount, 'Antal (mest först)', provider),
+              _sortMenuItem(SortMode.added, 'Tillagd ordning', provider),
+            ],
+          ),
           if (!finished)
             IconButton(
               icon: const Icon(Icons.stop_circle_outlined),
@@ -125,10 +136,25 @@ class _TallyBodyState extends State<_TallyBody> {
           ),
         ],
       ),
-      body: _TallyList(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openSearchSheet,
-        child: const Icon(Icons.add),
+      body: _TallyList(onAddSpecies: _openSearchSheet),
+    );
+  }
+
+  PopupMenuItem<SortMode> _sortMenuItem(
+      SortMode mode, String label, TallyProvider provider) {
+    return PopupMenuItem(
+      value: mode,
+      child: Row(
+        children: [
+          if (provider.sortMode == mode)
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Icon(Icons.check, size: 18),
+            )
+          else
+            const SizedBox(width: 26),
+          Text(label),
+        ],
       ),
     );
   }
@@ -333,7 +359,27 @@ enum _ExportMode { full, clipboard }
 // Aktuell lista
 // ---------------------------------------------------------------------------
 
-class _TallyList extends StatelessWidget {
+class _TallyList extends StatefulWidget {
+  final VoidCallback onAddSpecies;
+  const _TallyList({required this.onAddSpecies});
+
+  @override
+  State<_TallyList> createState() => _TallyListState();
+}
+
+class _TallyListState extends State<_TallyList> {
+  final Set<int> _collapsed = {};
+
+  void _toggleCollapse(int taxonId) {
+    setState(() {
+      if (_collapsed.contains(taxonId)) {
+        _collapsed.remove(taxonId);
+      } else {
+        _collapsed.add(taxonId);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TallyProvider>();
@@ -348,12 +394,22 @@ class _TallyList extends StatelessWidget {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Text(
-            'Tryck på + för att söka\noch lägga till arter.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Tryck på + för att söka\noch lägga till arter.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              FloatingActionButton(
+                onPressed: widget.onAddSpecies,
+                child: const Icon(Icons.add),
+              ),
+            ],
           ),
         ),
       );
@@ -367,6 +423,11 @@ class _TallyList extends StatelessWidget {
       final displayCount = item.isChild
           ? ownCount
           : provider.totalCountFor(taxon.taxonId);
+      final subRows = !item.isChild
+          ? provider.activityObservationsFor(taxon.taxonId)
+          : <ActivityObservation>[];
+      final hasSubRows = subRows.isNotEmpty;
+      final isCollapsed = _collapsed.contains(taxon.taxonId);
 
       if (rows.isNotEmpty) rows.add(const Divider(height: 1));
 
@@ -377,23 +438,39 @@ class _TallyList extends StatelessWidget {
         isChild: item.isChild,
         onIncrement: () => provider.increment(taxon.taxonId),
         onDecrement: () => provider.decrement(taxon.taxonId),
-        onTap: () => _showTaxonOptions(context, provider, taxon),
+        onTap: hasSubRows
+            ? () => _toggleCollapse(taxon.taxonId)
+            : () => _showTaxonOptions(context, provider, taxon),
+        onLongPress: () => _showTaxonOptions(context, provider, taxon),
+        hasSubRows: hasSubRows,
+        collapsed: isCollapsed,
+        multiplier: provider.multiplierFor(taxon.taxonId),
       ));
 
-      // Activity/stage/gender sub-rows (only for top-level taxa).
-      if (!item.isChild) {
-        for (final ao in provider.activityObservationsFor(taxon.taxonId)) {
+      // Activity/stage/gender sub-rows (only for top-level taxa, hide when collapsed).
+      if (!item.isChild && !isCollapsed) {
+        for (final ao in subRows) {
           rows.add(const Divider(height: 1));
           rows.add(_ActivityRow(
             ao: ao,
+            multiplier: provider.subRowMultiplierFor(ao.id ?? 0),
             onIncrement: () => provider.incrementActivity(ao),
             onDecrement: () => provider.decrementActivity(ao),
-            onDelete: () => provider.deleteActivityObservation(ao),
             onTap: () => _showSubRowOptions(context, provider, ao),
           ));
         }
       }
     }
+
+    rows.add(Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Center(
+        child: FloatingActionButton(
+          onPressed: widget.onAddSpecies,
+          child: const Icon(Icons.add),
+        ),
+      ),
+    ));
 
     return ListView(children: rows);
   }
@@ -403,10 +480,16 @@ class _TallyList extends StatelessWidget {
   /// - Top-level taxa (Art, Hybrid) become group heads.
   /// - Child taxa (Underart, Artkomplex, Kollektivtaxon) appear indented
   ///   below their parent, which is shown even if the parent has count = 0.
-  /// - Groups sorted by parent's sort_order; children sorted within group.
+  /// - Groups sorted according to the current [SortMode].
   List<_TallyItem> _buildItems(TallyProvider provider) {
     final pinned = provider.pinnedObservations;
     if (pinned.isEmpty) return [];
+
+    // Index for insertion-order sort.
+    final insertionOrder = <int, int>{};
+    for (var i = 0; i < pinned.length; i++) {
+      insertionOrder[pinned[i].taxonId] = i;
+    }
 
     // Separate top-level and child observations.
     final Map<int, List<int>> childrenByParent = {}; // parentId → [taxonIds]
@@ -429,13 +512,30 @@ class _TallyList extends StatelessWidget {
       ...childrenByParent.keys,
     };
 
-    // Sort group heads by sort_order.
-    final sortedHeads = groupHeadIds.toList()
-      ..sort((a, b) {
-        final ta = provider.taxonFor(a);
-        final tb = provider.taxonFor(b);
-        return (ta?.sortOrder ?? 0).compareTo(tb?.sortOrder ?? 0);
-      });
+    // Sort group heads according to the chosen mode.
+    final sortedHeads = groupHeadIds.toList();
+    switch (provider.sortMode) {
+      case SortMode.taxonomic:
+        sortedHeads.sort((a, b) {
+          final ta = provider.taxonFor(a);
+          final tb = provider.taxonFor(b);
+          return (ta?.sortOrder ?? 0).compareTo(tb?.sortOrder ?? 0);
+        });
+      case SortMode.alphabetic:
+        sortedHeads.sort((a, b) {
+          final ta = provider.taxonFor(a);
+          final tb = provider.taxonFor(b);
+          return (ta?.swedishName ?? '').compareTo(tb?.swedishName ?? '');
+        });
+      case SortMode.byCount:
+        sortedHeads.sort((a, b) {
+          return provider.totalCountFor(b).compareTo(provider.totalCountFor(a));
+        });
+      case SortMode.added:
+        sortedHeads.sort((a, b) {
+          return (insertionOrder[a] ?? 9999).compareTo(insertionOrder[b] ?? 9999);
+        });
+    }
 
     final items = <_TallyItem>[];
     for (final headId in sortedHeads) {
@@ -468,18 +568,13 @@ class _TallyList extends StatelessWidget {
         title: const Text('Om underrader'),
         content: const SingleChildScrollView(
           child: Text(
-            'En underrad är en individ eller en grupp individer av samma art '
-            'med gemensamma egenskaper. En och samma underrad kan ha både '
-            'aktivitet, kön och ålder bestämt samtidigt — t.ex. "sjungande '
-            'hane, adult".\n\n'
-            'Antalet på underraden räknas in i artens totalsumma. Vill du '
-            'registrera samma art med olika egenskaper lägger du till en '
-            'underrad per kombination.\n\n'
-            'Exempel: 3 koltrastar som sjunger + 2 som födosöker = två '
-            'underrader, totalt 5 koltrastar.\n\n'
-            'Obs: Om du lägger aktivitet, kön och ålder som tre separata '
-            'underrader räknas de som tre olika individer. Lägg dem på '
-            'samma underrad om det gäller samma individ(er).',
+            'Underrader räknas som separata fynd. Kön, ålder/stadie, '
+            'aktivitet och kommentar kan alla läggas in i samma underrad. '
+            'Underrader kan alltså ha olika egenskaper kopplade till sig, '
+            'eller samma, det väljer du själv. Summan av alla individer '
+            'räknas in i totalsiffran på huvudraden.\n\n'
+            'Att plussa på direkt i huvudraden räknas endast som notering '
+            'av art.',
           ),
         ),
         actions: [
@@ -496,8 +591,10 @@ class _TallyList extends StatelessWidget {
       BuildContext context, TallyProvider provider, Taxon taxon) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) => SafeArea(
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Padding(
@@ -555,6 +652,22 @@ class _TallyList extends StatelessWidget {
                 _showGenderPicker(context, provider, taxon: taxon);
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Kommentar'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showCommentEditor(context, provider, taxon: taxon);
+              },
+            ),
+            const Divider(height: 1),
+            _MultiplierPicker(
+              current: provider.multiplierFor(taxon.taxonId),
+              onChanged: (v) {
+                provider.setMultiplier(taxon.taxonId, v);
+                Navigator.pop(ctx);
+              },
+            ),
             const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.delete_outline),
@@ -565,6 +678,7 @@ class _TallyList extends StatelessWidget {
               },
             ),
           ],
+          ),
         ),
       ),
     );
@@ -574,8 +688,10 @@ class _TallyList extends StatelessWidget {
       BuildContext context, TallyProvider provider, ActivityObservation ao) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) => SafeArea(
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
@@ -608,6 +724,24 @@ class _TallyList extends StatelessWidget {
                 _showGenderPicker(context, provider, ao: ao);
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: Text(ao.hasAnyComment
+                  ? 'Ändra kommentar'
+                  : 'Lägg till kommentar'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showCommentEditor(context, provider, ao: ao);
+              },
+            ),
+            const Divider(height: 1),
+            _MultiplierPicker(
+              current: provider.subRowMultiplierFor(ao.id ?? 0),
+              onChanged: (v) {
+                provider.setSubRowMultiplier(ao.id ?? 0, v);
+                Navigator.pop(ctx);
+              },
+            ),
             const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.delete_outline),
@@ -618,6 +752,7 @@ class _TallyList extends StatelessWidget {
               },
             ),
           ],
+          ),
         ),
       ),
     );
@@ -680,6 +815,31 @@ class _TallyList extends StatelessWidget {
         }
       },
     );
+  }
+
+  Future<void> _showCommentEditor(
+    BuildContext context,
+    TallyProvider provider, {
+    Taxon? taxon,
+    ActivityObservation? ao,
+  }) async {
+    final result = await showDialog<_CommentEditorResult>(
+      context: context,
+      builder: (_) => _CommentEditorDialog(
+        initialPublic: ao?.commentPublic ?? '',
+        initialPrivate: ao?.commentPrivate ?? '',
+      ),
+    );
+    if (result == null) return;
+    if (ao != null) {
+      await provider.setCommentsOnSubRow(
+          ao, result.commentPublic, result.commentPrivate);
+    } else if (taxon != null) {
+      if (result.commentPublic.isEmpty && result.commentPrivate.isEmpty) return;
+      await provider.addComments(
+          taxon.taxonId, result.commentPublic, result.commentPrivate);
+      if (context.mounted) _maybeShowSubRowSnackbar(context, provider);
+    }
   }
 
   void _showGenderPicker(BuildContext context, TallyProvider provider,
@@ -760,21 +920,151 @@ class _TallyItem {
 }
 
 // ---------------------------------------------------------------------------
+// Comment editor
+// ---------------------------------------------------------------------------
+
+class _CommentEditorResult {
+  final String commentPublic;
+  final String commentPrivate;
+  const _CommentEditorResult(this.commentPublic, this.commentPrivate);
+}
+
+enum _CommentMode { publik, privat }
+
+class _CommentEditorDialog extends StatefulWidget {
+  final String initialPublic;
+  final String initialPrivate;
+
+  const _CommentEditorDialog({
+    required this.initialPublic,
+    required this.initialPrivate,
+  });
+
+  @override
+  State<_CommentEditorDialog> createState() => _CommentEditorDialogState();
+}
+
+class _CommentEditorDialogState extends State<_CommentEditorDialog> {
+  static const _maxLen = 1000;
+
+  late String _public = widget.initialPublic;
+  late String _private = widget.initialPrivate;
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initialPublic);
+  _CommentMode _mode = _CommentMode.publik;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _switchMode(_CommentMode mode) {
+    if (mode == _mode) return;
+    if (_mode == _CommentMode.publik) {
+      _public = _controller.text;
+    } else {
+      _private = _controller.text;
+    }
+    setState(() {
+      _mode = mode;
+      _controller.text =
+          mode == _CommentMode.publik ? _public : _private;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: const Text('Kommentar'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SegmentedButton<_CommentMode>(
+              segments: const [
+                ButtonSegment(
+                  value: _CommentMode.publik,
+                  label: Text('Publik'),
+                  icon: Icon(Icons.public, size: 18),
+                ),
+                ButtonSegment(
+                  value: _CommentMode.privat,
+                  label: Text('Privat'),
+                  icon: Icon(Icons.lock_outline, size: 18),
+                ),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (s) => _switchMode(s.first),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _mode == _CommentMode.publik
+                  ? 'Syns för alla på Artportalen.'
+                  : 'Syns bara för dig på Artportalen.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              maxLength: _maxLen,
+              maxLines: 5,
+              minLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Fritext…',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Avbryt'),
+        ),
+        TextButton(
+          onPressed: () {
+            if (_mode == _CommentMode.publik) {
+              _public = _controller.text;
+            } else {
+              _private = _controller.text;
+            }
+            Navigator.pop(
+              context,
+              _CommentEditorResult(_public.trim(), _private.trim()),
+            );
+          },
+          child: const Text('Spara'),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Activity sub-row
 // ---------------------------------------------------------------------------
 
 class _ActivityRow extends StatefulWidget {
   final ActivityObservation ao;
+  final int multiplier;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
-  final VoidCallback onDelete;
   final VoidCallback onTap;
 
   const _ActivityRow({
     required this.ao,
+    this.multiplier = 1,
     required this.onIncrement,
     required this.onDecrement,
-    required this.onDelete,
     required this.onTap,
   });
 
@@ -794,7 +1084,7 @@ class _ActivityRowState extends State<_ActivityRow> {
       fontStyle: FontStyle.italic,
     );
     return Padding(
-      padding: const EdgeInsets.only(left: 32),
+      padding: const EdgeInsets.only(left: 32, right: 12),
       child: AnimatedSize(
         duration: const Duration(milliseconds: 150),
         alignment: Alignment.topCenter,
@@ -824,6 +1114,18 @@ class _ActivityRowState extends State<_ActivityRow> {
                               ? TextOverflow.visible
                               : TextOverflow.ellipsis,
                         ),
+                        if (ao.commentPublic.isNotEmpty)
+                          _CommentLine(
+                            icon: Icons.public,
+                            text: ao.commentPublic,
+                            expanded: _expanded,
+                          ),
+                        if (ao.commentPrivate.isNotEmpty)
+                          _CommentLine(
+                            icon: Icons.lock_outline,
+                            text: ao.commentPrivate,
+                            expanded: _expanded,
+                          ),
                         if (ao.count == 0)
                           Text(
                             'Tryck + för att räkna',
@@ -837,45 +1139,155 @@ class _ActivityRowState extends State<_ActivityRow> {
                   ),
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.close, size: 16),
-                onPressed: widget.onDelete,
-                tooltip: 'Ta bort underrad',
-                padding: EdgeInsets.zero,
-              ),
-              SizedBox(
-                width: 40,
-                child: IconButton(
-                  onPressed: ao.count > 0 ? widget.onDecrement : null,
-                  icon: const Icon(Icons.remove, size: 18),
-                  padding: EdgeInsets.zero,
-                ),
-              ),
-              SizedBox(
-                width: 36,
-                child: Text(
-                  '${ao.count}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 40,
-                child: IconButton(
-                  onPressed: widget.onIncrement,
-                  icon: const Icon(Icons.add, size: 18),
-                  padding: EdgeInsets.zero,
-                ),
+              TallyCounter(
+                count: ao.count,
+                onIncrement: widget.onIncrement,
+                onDecrement: widget.onDecrement,
+                small: true,
+                multiplier: widget.multiplier,
               ),
             ],
           ),
         ),
       ),
     );
+  }
+}
+
+class _CommentLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool expanded;
+
+  const _CommentLine({
+    required this.icon,
+    required this.text,
+    required this.expanded,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75);
+    final style = theme.textTheme.bodySmall?.copyWith(color: color);
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2, right: 4),
+            child: Icon(icon, size: 12, color: color),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: style,
+              maxLines: expanded ? null : 1,
+              overflow:
+                  expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Multiplier picker (used inside taxon & sub-row bottom sheets)
+// ---------------------------------------------------------------------------
+
+class _MultiplierPicker extends StatelessWidget {
+  final int current;
+  final ValueChanged<int> onChanged;
+
+  const _MultiplierPicker({required this.current, required this.onChanged});
+
+  static const _presets = [1, 5, 10, 50];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.speed,
+                  size: 20, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 12),
+              Text('Multiplikator', style: theme.textTheme.bodyMedium),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              for (final v in _presets)
+                ChoiceChip(
+                  label: Text('x$v'),
+                  selected: current == v,
+                  onSelected: (_) => onChanged(v),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                ),
+              ActionChip(
+                label: Text(!_presets.contains(current) && current > 1
+                    ? 'x$current'
+                    : '…'),
+                onPressed: () => _pickCustom(context),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _pickCustom(BuildContext context) {
+    final controller = TextEditingController(
+      text: current > 1 ? '$current' : '',
+    );
+    showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Anpassad multiplikator'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            hintText: 'Antal per tryck',
+            prefixText: 'x',
+          ),
+          onSubmitted: (v) {
+            final n = int.tryParse(v);
+            if (n != null && n >= 1) Navigator.pop(ctx, n);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Avbryt'),
+          ),
+          TextButton(
+            onPressed: () {
+              final n = int.tryParse(controller.text);
+              if (n != null && n >= 1) Navigator.pop(ctx, n);
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    ).then((v) {
+      if (v != null) onChanged(v);
+    });
   }
 }
 

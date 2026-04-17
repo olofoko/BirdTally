@@ -1,4 +1,5 @@
-/// A species count with optional activity, ålder-stadium, and kön — sub-record under an Observation.
+/// A species count with optional activity, ålder-stadium, kön, and
+/// free-text comments — sub-record under an Observation.
 class ActivityObservation {
   final int? id;
   final int sessionId;
@@ -6,6 +7,8 @@ class ActivityObservation {
   final String activity;
   final String stage;
   final String gender;
+  final String commentPublic;
+  final String commentPrivate;
   final int count;
 
   const ActivityObservation({
@@ -15,6 +18,8 @@ class ActivityObservation {
     this.activity = '',
     this.stage = '',
     this.gender = '',
+    this.commentPublic = '',
+    this.commentPrivate = '',
     required this.count,
   });
 
@@ -26,6 +31,8 @@ class ActivityObservation {
       activity: map['activity'] as String? ?? '',
       stage: map['stage'] as String? ?? '',
       gender: map['gender'] as String? ?? '',
+      commentPublic: map['comment_public'] as String? ?? '',
+      commentPrivate: map['comment_private'] as String? ?? '',
       count: map['count'] as int,
     );
   }
@@ -37,6 +44,8 @@ class ActivityObservation {
         'activity': activity,
         'stage': stage,
         'gender': gender,
+        'comment_public': commentPublic,
+        'comment_private': commentPrivate,
         'count': count,
       };
 
@@ -45,6 +54,8 @@ class ActivityObservation {
     String? activity,
     String? stage,
     String? gender,
+    String? commentPublic,
+    String? commentPrivate,
     int? count,
   }) =>
       ActivityObservation(
@@ -54,12 +65,18 @@ class ActivityObservation {
         activity: activity ?? this.activity,
         stage: stage ?? this.stage,
         gender: gender ?? this.gender,
+        commentPublic: commentPublic ?? this.commentPublic,
+        commentPrivate: commentPrivate ?? this.commentPrivate,
         count: count ?? this.count,
       );
 
-  /// Label shown in the tally list, combining non-empty fields.
+  /// Label shown in the tally list, combining non-empty activity/stage/gender.
+  /// Comments are rendered separately by the row widget.
   String get label {
     final parts = [activity, stage, gender].where((s) => s.isNotEmpty).toList();
     return parts.join('  ');
   }
+
+  bool get hasAnyComment =>
+      commentPublic.isNotEmpty || commentPrivate.isNotEmpty;
 }

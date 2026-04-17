@@ -7,6 +7,8 @@ import '../models/observation.dart';
 import '../models/session.dart';
 import '../models/taxon.dart';
 
+enum SortMode { added, taxonomic, alphabetic, byCount }
+
 /// Manages observations and taxa for the currently active session.
 ///
 /// Auto-saves every count change to the database immediately.
@@ -18,13 +20,39 @@ class TallyProvider extends ChangeNotifier {
   Map<int, Taxon> _taxa = {};
   bool _loading = true;
   bool _subRowHintShown = false;
+  SortMode _sortMode = SortMode.added;
+
+  // Multiplier per main row (taxonId → multiplier) and per sub-row (ao.id → multiplier).
+  // UI-only state, not persisted. Defaults to 1.
+  final Map<int, int> _multipliers = {};
+  final Map<int, int> _subRowMultipliers = {};
 
   Session? get session => _session;
   bool get loading => _loading;
   bool get subRowHintShown => _subRowHintShown;
+  SortMode get sortMode => _sortMode;
+
+  void setSortMode(SortMode mode) {
+    _sortMode = mode;
+    notifyListeners();
+  }
 
   void markSubRowHintShown() {
     _subRowHintShown = true;
+  }
+
+  int multiplierFor(int taxonId) => _multipliers[taxonId] ?? 1;
+
+  int subRowMultiplierFor(int aoId) => _subRowMultipliers[aoId] ?? 1;
+
+  void setMultiplier(int taxonId, int value) {
+    _multipliers[taxonId] = value;
+    notifyListeners();
+  }
+
+  void setSubRowMultiplier(int aoId, int value) {
+    _subRowMultipliers[aoId] = value;
+    notifyListeners();
   }
 
   /// Observations that are pinned (shown in Aktuell lista), sorted by sort_order.
@@ -53,11 +81,16 @@ class TallyProvider extends ChangeNotifier {
         .count;
   }
 
-  /// Activity sub-records for a taxon, sorted by activity name.
+  /// Activity sub-records for a taxon, sorted by activity name with id as
+  /// tiebreaker so rows with identical attributes keep their creation order.
   List<ActivityObservation> activityObservationsFor(int taxonId) {
     final list = List<ActivityObservation>.from(
         _activityObservations[taxonId] ?? []);
-    list.sort((a, b) => a.activity.compareTo(b.activity));
+    list.sort((a, b) {
+      final byActivity = a.activity.compareTo(b.activity);
+      if (byActivity != 0) return byActivity;
+      return (a.id ?? 1 << 30).compareTo(b.id ?? 1 << 30);
+    });
     return list;
   }
 
@@ -121,19 +154,20 @@ class TallyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> increment(int taxonId) => _adjust(taxonId, 1);
+  Future<void> increment(int taxonId) =>
+      _adjust(taxonId, multiplierFor(taxonId));
 
   Future<void> decrement(int taxonId) {
     if (countFor(taxonId) <= 0) return Future.value();
-    return _adjust(taxonId, -1);
+    return _adjust(taxonId, -multiplierFor(taxonId));
   }
 
   Future<void> incrementActivity(ActivityObservation ao) =>
-      _adjustActivity(ao, 1);
+      _adjustActivity(ao, subRowMultiplierFor(ao.id ?? 0));
 
   Future<void> decrementActivity(ActivityObservation ao) {
     if (ao.count <= 0) return Future.value();
-    return _adjustActivity(ao, -1);
+    return _adjustActivity(ao, -subRowMultiplierFor(ao.id ?? 0));
   }
 
   Future<void> addActivity(int taxonId, String activity) async {
@@ -157,6 +191,20 @@ class TallyProvider extends ChangeNotifier {
     await _adjustActivity(
         ActivityObservation(
             sessionId: _session!.id!, taxonId: taxonId, gender: gender, count: 0),
+        1);
+  }
+
+  Future<void> addComments(
+      int taxonId, String commentPublic, String commentPrivate) async {
+    await _ensurePinned(taxonId);
+    await _adjustActivity(
+        ActivityObservation(
+          sessionId: _session!.id!,
+          taxonId: taxonId,
+          commentPublic: commentPublic,
+          commentPrivate: commentPrivate,
+          count: 0,
+        ),
         1);
   }
 
@@ -184,19 +232,24 @@ class TallyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Looks up the current in-memory version of [ao] so callers that hold a
-  /// stale closure reference (possibly with id=null) always operate on the
-  /// row that has the real DB id.
+  Future<void> setCommentsOnSubRow(
+      ActivityObservation ao, String commentPublic, String commentPrivate) async {
+    final fresh = _freshSubRow(ao);
+    final updated = await SessionDao.instance.setSubRowProperties(
+      fresh,
+      commentPublic: commentPublic,
+      commentPrivate: commentPrivate,
+    );
+    _replaceSubRow(fresh, updated);
+    notifyListeners();
+  }
+
+  /// Looks up the current in-memory version of [ao] by id so callers that
+  /// hold a stale closure reference always operate on the latest state.
   ActivityObservation _freshSubRow(ActivityObservation ao) {
     final list = _activityObservations[ao.taxonId] ?? [];
-    if (ao.id != null) {
-      final byId = list.firstWhere((a) => a.id == ao.id, orElse: () => ao);
-      return byId;
-    }
-    return list.firstWhere(
-      (a) => a.activity == ao.activity && a.stage == ao.stage && a.gender == ao.gender,
-      orElse: () => ao,
-    );
+    if (ao.id == null) return ao;
+    return list.firstWhere((a) => a.id == ao.id, orElse: () => ao);
   }
 
   void _replaceSubRow(ActivityObservation old, ActivityObservation updated) {
@@ -327,12 +380,12 @@ class TallyProvider extends ChangeNotifier {
     final list = List<ActivityObservation>.from(
         _activityObservations[taxonId] ?? []);
 
+    // Only match existing rows by explicit id. Templates without an id always
+    // create a new sub-row, so "Lägg till aktivitet" with the same value twice
+    // produces two distinct rows (the user can then disambiguate them).
     final idx = template.id != null
         ? list.indexWhere((a) => a.id == template.id)
-        : list.indexWhere((a) =>
-            a.activity == template.activity &&
-            a.stage == template.stage &&
-            a.gender == template.gender);
+        : -1;
 
     ActivityObservation obs;
     if (idx >= 0) {
@@ -347,6 +400,8 @@ class TallyProvider extends ChangeNotifier {
         activity: template.activity,
         stage: template.stage,
         gender: template.gender,
+        commentPublic: template.commentPublic,
+        commentPrivate: template.commentPrivate,
         count: delta,
       );
       list.add(obs);
@@ -358,14 +413,13 @@ class TallyProvider extends ChangeNotifier {
     final saved = await SessionDao.instance.upsertActivityObservation(obs);
     final savedList = List<ActivityObservation>.from(
         _activityObservations[taxonId] ?? []);
-    int savedIdx = saved.id != null
-        ? savedList.indexWhere((a) => a.id == saved.id)
-        : -1;
-    if (savedIdx < 0) {
-      savedIdx = savedList.indexWhere((a) =>
-          a.activity == saved.activity &&
-          a.stage == saved.stage &&
-          a.gender == saved.gender);
+    int savedIdx = -1;
+    if (saved.id != null) {
+      savedIdx = savedList.indexWhere((a) => a.id == saved.id);
+    }
+    if (savedIdx < 0 && obs.id == null) {
+      // Newly-created row — match the placeholder we just appended (no id yet).
+      savedIdx = savedList.indexWhere((a) => identical(a, obs));
     }
     if (savedIdx >= 0) {
       savedList[savedIdx] = saved;

@@ -52,7 +52,7 @@ class AppDatabase {
 
     return openDatabase(
       path,
-      version: 8,
+      version: 10,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -171,19 +171,80 @@ class AppDatabase {
     if (oldVersion < 8) {
       await db.execute('ALTER TABLE sites ADD COLUMN landskap TEXT');
     }
+    if (oldVersion < 9) {
+      // Recreate activity_observations with comment_public/comment_private
+      // columns. (Later replaced by v10 which drops the UNIQUE constraint —
+      // we still run the v9 step for DBs upgrading from v8 so comment columns
+      // exist before v10 restructures the table.)
+      await db.execute('''
+        CREATE TABLE activity_observations_new (
+          id               INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id       INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+          taxon_id         INTEGER NOT NULL,
+          activity         TEXT NOT NULL DEFAULT '',
+          stage            TEXT NOT NULL DEFAULT '',
+          gender           TEXT NOT NULL DEFAULT '',
+          comment_public   TEXT NOT NULL DEFAULT '',
+          comment_private  TEXT NOT NULL DEFAULT '',
+          count            INTEGER NOT NULL DEFAULT 0,
+          UNIQUE (session_id, taxon_id, activity, stage, gender, comment_public, comment_private)
+        )
+      ''');
+      await db.execute('''
+        INSERT INTO activity_observations_new
+          (id, session_id, taxon_id, activity, stage, gender, comment_public, comment_private, count)
+        SELECT id, session_id, taxon_id, activity, stage, gender, '', '', count
+        FROM activity_observations
+      ''');
+      await db.execute('DROP TABLE activity_observations');
+      await db.execute(
+          'ALTER TABLE activity_observations_new RENAME TO activity_observations');
+      await db.execute(
+          'CREATE INDEX idx_act_obs_session ON activity_observations(session_id)');
+    }
+    if (oldVersion < 10) {
+      // Drop the UNIQUE constraint so the user can create multiple sub-rows
+      // with identical attributes (e.g. two "sträckande N" rows filled in
+      // with different comments afterwards).
+      await db.execute('''
+        CREATE TABLE activity_observations_new (
+          id               INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id       INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+          taxon_id         INTEGER NOT NULL,
+          activity         TEXT NOT NULL DEFAULT '',
+          stage            TEXT NOT NULL DEFAULT '',
+          gender           TEXT NOT NULL DEFAULT '',
+          comment_public   TEXT NOT NULL DEFAULT '',
+          comment_private  TEXT NOT NULL DEFAULT '',
+          count            INTEGER NOT NULL DEFAULT 0
+        )
+      ''');
+      await db.execute('''
+        INSERT INTO activity_observations_new
+          (id, session_id, taxon_id, activity, stage, gender, comment_public, comment_private, count)
+        SELECT id, session_id, taxon_id, activity, stage, gender, comment_public, comment_private, count
+        FROM activity_observations
+      ''');
+      await db.execute('DROP TABLE activity_observations');
+      await db.execute(
+          'ALTER TABLE activity_observations_new RENAME TO activity_observations');
+      await db.execute(
+          'CREATE INDEX idx_act_obs_session ON activity_observations(session_id)');
+    }
   }
 
   Future<void> _createActivityObservations(Database db) async {
     await db.execute('''
       CREATE TABLE activity_observations (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id  INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-        taxon_id    INTEGER NOT NULL,
-        activity    TEXT NOT NULL DEFAULT '',
-        stage       TEXT NOT NULL DEFAULT '',
-        gender      TEXT NOT NULL DEFAULT '',
-        count       INTEGER NOT NULL DEFAULT 0,
-        UNIQUE (session_id, taxon_id, activity, stage, gender)
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id       INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        taxon_id         INTEGER NOT NULL,
+        activity         TEXT NOT NULL DEFAULT '',
+        stage            TEXT NOT NULL DEFAULT '',
+        gender           TEXT NOT NULL DEFAULT '',
+        comment_public   TEXT NOT NULL DEFAULT '',
+        comment_private  TEXT NOT NULL DEFAULT '',
+        count            INTEGER NOT NULL DEFAULT 0
       )
     ''');
     await db.execute(

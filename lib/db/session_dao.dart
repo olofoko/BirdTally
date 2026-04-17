@@ -223,6 +223,33 @@ class SessionDao {
   }
 
   // ---------------------------------------------------------------------------
+  // Site summaries
+  // ---------------------------------------------------------------------------
+
+  /// Returns a summary for the given site: last visit date and total unique
+  /// species count across all sessions at the site.
+  Future<SiteSummary> getSiteSummary(int siteId) async {
+    final db = await AppDatabase.instance.appDb;
+    final lastRow = await db.query('sessions',
+        where: 'site_id = ? AND is_template = 0',
+        whereArgs: [siteId],
+        orderBy: 'date DESC',
+        limit: 1);
+    DateTime? lastVisit;
+    if (lastRow.isNotEmpty) {
+      lastVisit = DateTime.fromMillisecondsSinceEpoch(lastRow.first['date'] as int);
+    }
+    final countResult = await db.rawQuery('''
+      SELECT COUNT(DISTINCT o.taxon_id) AS cnt
+      FROM observations o
+      JOIN sessions s ON s.id = o.session_id
+      WHERE s.site_id = ? AND s.is_template = 0 AND o.count > 0
+    ''', [siteId]);
+    final speciesCount = (countResult.first['cnt'] as int?) ?? 0;
+    return SiteSummary(lastVisit: lastVisit, speciesCount: speciesCount);
+  }
+
+  // ---------------------------------------------------------------------------
   // Activity observations
   // ---------------------------------------------------------------------------
 
@@ -254,44 +281,28 @@ class SessionDao {
     return obs.copyWith(id: id);
   }
 
-  /// Updates stage and/or gender on an existing sub-row.
-  /// If the resulting (activity, stage, gender) combination already exists for
-  /// the same (session_id, taxon_id), the counts are merged and the old row deleted.
+  /// Updates activity/stage/gender/comment fields on an existing sub-row.
+  /// Does not merge with other rows, even if attributes end up identical —
+  /// the user chose to create separate sub-rows and we keep them distinct.
   Future<ActivityObservation> setSubRowProperties(
     ActivityObservation ao, {
     String? activity,
     String? stage,
     String? gender,
+    String? commentPublic,
+    String? commentPrivate,
   }) async {
     final db = await AppDatabase.instance.appDb;
-    final newActivity = activity ?? ao.activity;
-    final newStage = stage ?? ao.stage;
-    final newGender = gender ?? ao.gender;
-
-    // Check if a row with the new combination already exists (other than this row).
-    final existing = await db.query(
-      'activity_observations',
-      where:
-          'session_id = ? AND taxon_id = ? AND activity = ? AND stage = ? AND gender = ? AND id != ?',
-      whereArgs: [
-        ao.sessionId, ao.taxonId, newActivity, newStage, newGender, ao.id ?? -1
-      ],
+    final updated = ao.copyWith(
+      activity: activity ?? ao.activity,
+      stage: stage ?? ao.stage,
+      gender: gender ?? ao.gender,
+      commentPublic: commentPublic ?? ao.commentPublic,
+      commentPrivate: commentPrivate ?? ao.commentPrivate,
     );
-
-    if (existing.isNotEmpty) {
-      final other = ActivityObservation.fromMap(existing.first);
-      final merged = other.copyWith(count: other.count + ao.count);
-      await db.update('activity_observations', merged.toMap(),
-          where: 'id = ?', whereArgs: [other.id]);
-      await db.delete('activity_observations',
-          where: 'id = ?', whereArgs: [ao.id]);
-      return merged;
-    } else {
-      final updated = ao.copyWith(activity: newActivity, stage: newStage, gender: newGender);
-      await db.update('activity_observations', updated.toMap(),
-          where: 'id = ?', whereArgs: [ao.id]);
-      return updated;
-    }
+    await db.update('activity_observations', updated.toMap(),
+        where: 'id = ?', whereArgs: [ao.id]);
+    return updated;
   }
 
   Future<void> deleteActivityObservation(int id) async {
@@ -403,5 +414,71 @@ class SessionDao {
         });
       }
     });
+  }
+}
+
+class SiteSummary {
+  final DateTime? lastVisit;
+  final int speciesCount;
+  const SiteSummary({this.lastVisit, this.speciesCount = 0});
+}
+
+/// A session with its site and the chain of folders leading to it.
+/// [breadcrumbFolders] is ordered root → leaf.
+class SessionWithContext {
+  final Session session;
+  final Site? site;
+  final List<Folder> breadcrumbFolders;
+  const SessionWithContext({
+    required this.session,
+    this.site,
+    this.breadcrumbFolders = const [],
+  });
+}
+
+extension SessionDateView on SessionDao {
+  /// Returns every non-template session ordered by date DESC, with its
+  /// site and full folder breadcrumb resolved in a single batch of queries.
+  Future<List<SessionWithContext>> getAllSessionsForDateView() async {
+    final db = await AppDatabase.instance.appDb;
+    final sessionRows = await db.query('sessions',
+        where: 'is_template = 0', orderBy: 'date DESC');
+    final sessions = sessionRows.map(Session.fromMap).toList();
+    if (sessions.isEmpty) return [];
+
+    final siteIds = sessions
+        .map((s) => s.siteId)
+        .whereType<int>()
+        .toSet()
+        .toList();
+    final sitesById = <int, Site>{};
+    if (siteIds.isNotEmpty) {
+      final placeholders = siteIds.map((_) => '?').join(', ');
+      final siteRows = await db.rawQuery(
+          'SELECT * FROM sites WHERE id IN ($placeholders)', siteIds);
+      for (final row in siteRows.map(Site.fromMap)) {
+        if (row.id != null) sitesById[row.id!] = row;
+      }
+    }
+
+    final folderRows = await db.query('folders');
+    final foldersById = <int, Folder>{
+      for (final row in folderRows.map(Folder.fromMap))
+        if (row.id != null) row.id!: row,
+    };
+
+    return sessions.map((session) {
+      final site = session.siteId != null ? sitesById[session.siteId] : null;
+      final crumbs = <Folder>[];
+      int? currentId = site?.folderId;
+      while (currentId != null) {
+        final folder = foldersById[currentId];
+        if (folder == null) break;
+        crumbs.insert(0, folder);
+        currentId = folder.parentFolderId;
+      }
+      return SessionWithContext(
+          session: session, site: site, breadcrumbFolders: crumbs);
+    }).toList();
   }
 }

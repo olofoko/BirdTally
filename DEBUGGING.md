@@ -143,8 +143,34 @@ Make it visually clearer that every sub-row represents at least one individual, 
 > **c) Inline gråtext** under etiketten på underrader med count = 0:
 > > *"Tryck + för att räkna"*
 
-### UX4 — Warn that separate activity + gender + age = 3 individuals
-If a user adds activity, gender, and age as separate sub-rows rather than on a single combined row, it implies three separate individuals. Show a clear hint or warning about this — ideally near the sub-row area or as part of the UX2 explanation above.
+### UX4 — Warn that separate activity + gender + age + comment = 4 records
+If a user adds activity, gender, and age as separate sub-rows rather than on a single combined row, it implies three separate record and thus individuals. Show a clear hint or warning about this — ideally near the sub-row area or as part of the UX2 explanation above.
+
+### UX5 — Add species plus sign - move so it is always beneath the bottom row of bird rows.
+Currently, if the list screen gets filled up with rows, the bottom row's functionality gets blocket by the plus sign.
+
+### UX6 — Tap fast on main row to hide sub-rows, tap again to show
+A list with many different subrows gets very long. Hiding subrows would make the list more readable.
+### UX6a - Hold for adding subrows (and choose multiplier, see UX9 below)
+Since tapping fast now hides subrows, adding more subrows etc. needs to be differentiated.
+
+### UX7 — Option to choose sort order in lists
+Currently, bird records are sorted by taxonomic order. The user should be able to choose to sort by:
+- Rows sorted by order added to list
+- Rows sorted by taxonomic order
+- Rows sorted by alphabetic order
+- Rows sorted by number of recorded birds
+This should be an option avaible from the list view. The same options menu could be accessible from there, with these options added.
+
+### UX8 — Bigger + and - buttons.
+Bigger buttons and + & - symbols
+
+### UX9 — Choose different + and - multiplier
+Currently, for each time the user uses the + and - button to add an individual, 1 record is added. For many circumstances, birds fly by in large flocks. A quick setting for each row (and subrow) should be availble when hold-tapping each row (as explained in UX6a above). This multiplier should always be visible on each row, like for example "x1" "x5" "x10"
+- Default multiplier is "x1". Presets are "x5" "x10" "x50". A custom option should be availble, with numeric input.
+
+### UX10 - Sorting order when searching
+Right now, uncommon species that match the searh by name (somehow, not sure which critera is used in the search function) better are displayed on the top of the search results. It would be better if the more common species show up at the top when searching. To do this, species that are assesed in the red list (LC, NT, VU, EN, CR) species should always be displayed on top of non-assesed species (none of the above mentioned categories). This will match the scrolling for species feature a bit more as well.
 
 > **Claudes textförslag (ej beslutat):**
 >
@@ -174,19 +200,19 @@ Long activity/stage/gender labels on sub-rows are clipped and not fully readable
 > Onboarding-snackbar första gången en trunkerad underrad visas:
 > > *"Tryck och håll för att se hela texten"*
 
-### UX6 — Long-press på +/− för bulk-räkning
+### UX11 — Long-press på +/− för bulk-räkning
 Långtryck på + (eller −) ökar/minskar med 5 eller 10 åt gången, med haptisk feedback. Snabbare när man räknar stora flockar (t.ex. 80 grågäss på en åker) — slipper trycka 80 gånger.
 
-### UX7 — Större träffyta på +-knappen
+### UX12 — Större träffyta på +-knappen
 + används betydligt oftare än − under ett besök. Gör +-knappen större/mer prominent än −, så det blir lättare att träffa rätt med kalla fingrar eller vantar i fält.
 
-### UX8 — Visa kontext på lokaler i hemskärmen
+### UX13 — Visa kontext på lokaler i hemskärmen
 Vid varje lokal i trädet, visa en liten informationsrad: t.ex. "Senast besökt 8 apr · 14 arter totalt". Hjälper när man har många lokaler att snabbt orientera sig.
 
-### UX9 — Risk för misstryck mellan × och − på underrad
+### UX14 — Risk för misstryck mellan × och − på underrad
 På aktivitets-/stadie-/könsraderna ligger × (ta bort underrad) direkt bredvid − (minska antal). Lätt att råka radera hela underraden istället för att minska räknaren. Flytta × längre bort, sätt den bakom långtryck, eller kräv bekräftelse.
 
-### UX10 — Inställning för att stänga av hjälptexter
+### UX15 — Inställning för att stänga av hjälptexter
 Lägg till en toggle under kugghjulet på hemskärmen: **"Visa hjälptexter — av/på"** (default: på). När den är av döljs alla onboarding-texter och påminnelser:
 - Underrubrikerna i +-arket (UX1)
 - Infotexten + ?-knappen i "Lägg till underrad" (UX2)

@@ -43,6 +43,7 @@ class TaxonDao {
     final placeholders = allowedCategories.map((_) => '?').join(', ');
 
     // Two queries: matching taxa first, Pseudotaxon last.
+    // Assessed red-list categories (LC–CR) sort before non-assessed (DD, NE, NA, NULL).
     final rows = await db.rawQuery('''
       SELECT *,
         CASE WHEN category = 'Pseudotaxon' THEN 1 ELSE 0 END AS _is_pseudo,
@@ -50,12 +51,16 @@ class TaxonDao {
           WHEN LOWER(swedish_name) LIKE ?    THEN 0
           WHEN LOWER(scientific_name) LIKE ? THEN 1
           ELSE 2
-        END AS _match_rank
+        END AS _match_rank,
+        CASE
+          WHEN red_list_category IN ('LC','NT','VU','EN','CR') THEN 0
+          ELSE 1
+        END AS _assessed
       FROM taxa
       WHERE
         (LOWER(swedish_name) LIKE ? OR LOWER(scientific_name) LIKE ?)
         AND category IN ($placeholders)
-      ORDER BY _is_pseudo ASC, _match_rank ASC, sort_order ASC
+      ORDER BY _is_pseudo ASC, _match_rank ASC, _assessed ASC, sort_order ASC
     ''', [q, q, q, q, ...allowedCategories]);
 
     return rows.map(Taxon.fromMap).toList();

@@ -18,6 +18,10 @@ class ObservationRow extends StatelessWidget {
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final bool hasSubRows;
+  final bool collapsed;
+  final int multiplier;
 
   const ObservationRow({
     super.key,
@@ -28,6 +32,10 @@ class ObservationRow extends StatelessWidget {
     required this.onIncrement,
     required this.onDecrement,
     this.onTap,
+    this.onLongPress,
+    this.hasSubRows = false,
+    this.collapsed = false,
+    this.multiplier = 1,
   });
 
   @override
@@ -43,26 +51,35 @@ class ObservationRow extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Padding(
-        padding: EdgeInsets.only(left: isChild ? 32.0 : 0.0),
+        padding: EdgeInsets.only(left: isChild ? 32.0 : 0.0, right: 12.0),
         child: SizedBox(
         height: isChild ? 52 : 64,
         child: Row(
           children: [
-            // Green dot — visible when this taxon's own count > 0.
+            // Green dot or collapse chevron.
             SizedBox(
               width: 20,
               child: Center(
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: ownCount > 0
-                        ? theme.colorScheme.primary
-                        : Colors.transparent,
-                  ),
-                ),
+                child: hasSubRows
+                    ? Icon(
+                        collapsed
+                            ? Icons.expand_more
+                            : Icons.expand_less,
+                        size: 18,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      )
+                    : Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: ownCount > 0
+                              ? theme.colorScheme.primary
+                              : Colors.transparent,
+                        ),
+                      ),
               ),
             ),
 
@@ -84,11 +101,12 @@ class ObservationRow extends StatelessWidget {
             ),
 
             // Counter: − count +
-            _Counter(
+            TallyCounter(
               count: displayCount,
               onIncrement: onIncrement,
               onDecrement: onDecrement,
               small: isChild,
+              multiplier: multiplier,
             ),
           ],
         ),
@@ -98,39 +116,70 @@ class ObservationRow extends StatelessWidget {
   }
 }
 
-class _Counter extends StatelessWidget {
+/// Shared counter widget used by both main observation rows and sub-rows.
+class TallyCounter extends StatelessWidget {
   final int count;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
   final bool small;
+  final int multiplier;
 
-  const _Counter({
+  const TallyCounter({
+    super.key,
     required this.count,
     required this.onIncrement,
     required this.onDecrement,
-    required this.small,
+    this.small = false,
+    this.multiplier = 1,
   });
 
   @override
   Widget build(BuildContext context) {
-    final size = small ? 40.0 : 48.0;
+    final plusSize = small ? 40.0 : 48.0;
+    final minusSize = small ? 32.0 : 36.0;
     final fontSize = small ? 16.0 : 20.0;
+    final decrementEnabled = count > 0;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Multiplier label (hidden when x1).
+        if (multiplier > 1)
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Text(
+              'x$multiplier',
+              style: TextStyle(
+                fontSize: small ? 11 : 13,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1565C0),
+              ),
+            ),
+          ),
+        // − button: smaller red circle
         SizedBox(
-          width: size,
-          height: size,
-          child: IconButton(
-            onPressed: count > 0 ? onDecrement : null,
-            icon: const Icon(Icons.remove),
-            iconSize: small ? 18 : 22,
-            padding: EdgeInsets.zero,
+          width: minusSize,
+          height: minusSize,
+          child: Material(
+            color: decrementEnabled
+                ? const Color(0xFFD32F2F)
+                : Colors.grey.shade300,
+            shape: const CircleBorder(),
+            child: InkWell(
+              onTap: decrementEnabled ? onDecrement : null,
+              customBorder: const CircleBorder(),
+              child: Center(
+                child: Icon(
+                  Icons.remove,
+                  size: small ? 16 : 20,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ),
         ),
         SizedBox(
-          width: 36,
+          width: small ? 36 : 40,
           child: Text(
             '$count',
             textAlign: TextAlign.center,
@@ -141,14 +190,24 @@ class _Counter extends StatelessWidget {
             ),
           ),
         ),
+        // + button: larger green circle
         SizedBox(
-          width: size,
-          height: size,
-          child: IconButton(
-            onPressed: onIncrement,
-            icon: const Icon(Icons.add),
-            iconSize: small ? 18 : 22,
-            padding: EdgeInsets.zero,
+          width: plusSize,
+          height: plusSize,
+          child: Material(
+            color: const Color(0xFF388E3C),
+            shape: const CircleBorder(),
+            child: InkWell(
+              onTap: onIncrement,
+              customBorder: const CircleBorder(),
+              child: Center(
+                child: Icon(
+                  Icons.add,
+                  size: small ? 20 : 26,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ),
         ),
       ],

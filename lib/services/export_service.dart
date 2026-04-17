@@ -91,7 +91,52 @@ class ExportService {
     final buffer = StringBuffer();
     buffer.write('\uFEFF'); // UTF-8 BOM — tells Excel/Artportalen to use UTF-8
     buffer.writeln(_headers.join(_sep));
+    _writeSessionRows(
+      buffer,
+      session: session,
+      observations: observations,
+      taxa: taxa,
+      activityObservations: activityObservations,
+      siteName: siteName,
+      folderName: folderName,
+    );
+    return buffer.toString();
+  }
 
+  /// Builds a single CSV containing every session in [entries], each
+  /// contributing its own rows with its own site/times. Sessions whose
+  /// observations all have count = 0 are skipped.
+  String buildCombinedCsv(List<CombinedCsvEntry> entries) {
+    final buffer = StringBuffer();
+    buffer.write('\uFEFF');
+    buffer.writeln(_headers.join(_sep));
+    for (final entry in entries) {
+      final hasData = entry.observations.any((o) => o.count > 0) ||
+          entry.activityObservations.values
+              .any((list) => list.any((a) => a.count > 0));
+      if (!hasData) continue;
+      _writeSessionRows(
+        buffer,
+        session: entry.session,
+        observations: entry.observations,
+        taxa: entry.taxa,
+        activityObservations: entry.activityObservations,
+        siteName: entry.siteName,
+        folderName: entry.folderName,
+      );
+    }
+    return buffer.toString();
+  }
+
+  void _writeSessionRows(
+    StringBuffer buffer, {
+    required Session session,
+    required List<Observation> observations,
+    required Map<int, Taxon> taxa,
+    Map<int, List<ActivityObservation>> activityObservations = const {},
+    String? siteName,
+    String? folderName,
+  }) {
     final startDate = _dateFormat.format(session.date);
     final startTime = _timeFormat.format(session.date);
     final endDate =
@@ -113,10 +158,8 @@ class ExportService {
     for (final obs in observations) {
       final taxon = taxa[obs.taxonId];
       if (taxon == null) continue;
-
       final activities = activityObservations[obs.taxonId] ?? [];
 
-      // Main observation row — only if count > 0.
       if (obs.count > 0) {
         buffer.writeln(_buildRow(
           taxon: taxon,
@@ -124,6 +167,8 @@ class ExportService {
           activity: '',
           stage: '',
           gender: '',
+          commentPublic: '',
+          commentPrivate: '',
           lokalnamn: lokalnamn,
           huvudlokal: huvudlokal,
           ost: ost,
@@ -136,7 +181,6 @@ class ExportService {
         ).join(_sep));
       }
 
-      // One row per activity/stage/gender sub-record.
       for (final ao in activities) {
         if (ao.count == 0) continue;
         buffer.writeln(_buildRow(
@@ -145,6 +189,8 @@ class ExportService {
           activity: ao.activity,
           stage: ao.stage,
           gender: ao.gender,
+          commentPublic: ao.commentPublic,
+          commentPrivate: ao.commentPrivate,
           lokalnamn: lokalnamn,
           huvudlokal: huvudlokal,
           ost: ost,
@@ -157,8 +203,6 @@ class ExportService {
         ).join(_sep));
       }
     }
-
-    return buffer.toString();
   }
 
   List<String> _buildRow({
@@ -167,6 +211,8 @@ class ExportService {
     required String activity,
     required String stage,
     required String gender,
+    required String commentPublic,
+    required String commentPrivate,
     required String lokalnamn,
     required String huvudlokal,
     required String ost,
@@ -194,6 +240,9 @@ class ExportService {
     row[13] = startTime;                 // Starttid
     row[14] = endDate;                   // Slutdatum
     row[15] = endTime;                   // Sluttid
+    row[16] = _escape(commentPublic);    // Publik kommentar
+    // [17] Intressant kommentar — empty
+    row[18] = _escape(commentPrivate);   // Privat kommentar
     return row;
   }
 
@@ -204,4 +253,23 @@ class ExportService {
     }
     return value;
   }
+}
+
+/// One session's data for [ExportService.buildCombinedCsv].
+class CombinedCsvEntry {
+  final Session session;
+  final List<Observation> observations;
+  final Map<int, Taxon> taxa;
+  final Map<int, List<ActivityObservation>> activityObservations;
+  final String? siteName;
+  final String? folderName;
+
+  const CombinedCsvEntry({
+    required this.session,
+    required this.observations,
+    required this.taxa,
+    this.activityObservations = const {},
+    this.siteName,
+    this.folderName,
+  });
 }

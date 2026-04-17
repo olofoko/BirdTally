@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../db/app_database.dart';
 import '../../db/session_dao.dart';
 import '../../db/taxon_dao.dart';
 import '../../models/folder.dart';
@@ -15,6 +16,7 @@ import '../../models/session.dart';
 import '../../models/site.dart';
 import '../../providers/home_provider.dart';
 import '../../services/app_settings.dart';
+import '../../services/backup_service.dart';
 import '../../services/bulk_export_service.dart';
 import '../../services/export_service.dart';
 import '../../widgets/location_dialog.dart';
@@ -28,15 +30,24 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+enum _HomeViewMode { tree, date }
+
 class _HomeScreenState extends State<HomeScreen> {
   static final _dateFmt = DateFormat('d MMM yyyy', 'sv_SE');
   static final _timeFmt = DateFormat('HH:mm', 'sv_SE');
+  static final _dayHeaderFmt =
+      DateFormat("EEEE 'den' d MMMM yyyy", 'sv_SE');
 
   // Lazy-loaded children, keyed by parent id.
   final Map<int, List<Folder>> _subFoldersByFolder = {};
   final Map<int, List<Site>> _sitesByFolder = {};
   final Map<int, List<Session>> _sessionsBySite = {};
+  final Map<int, SiteSummary> _siteSummaries = {};
   final Set<String> _loadingNodes = {};
+
+  _HomeViewMode _viewMode = _HomeViewMode.tree;
+  List<SessionWithContext>? _dateViewData;
+  bool _loadingDateView = false;
 
   @override
   void initState() {
@@ -58,9 +69,13 @@ class _HomeScreenState extends State<HomeScreen> {
       SessionDao.instance.getSites(folderId: folderId),
     ]);
     if (!mounted) return;
+    final sites = results[1] as List<Site>;
+    // Load summaries for all sites in parallel.
+    await _loadSiteSummaries(sites);
+    if (!mounted) return;
     setState(() {
       _subFoldersByFolder[folderId] = results[0] as List<Folder>;
-      _sitesByFolder[folderId] = results[1] as List<Site>;
+      _sitesByFolder[folderId] = sites;
       _loadingNodes.remove('f$folderId');
     });
   }
@@ -87,6 +102,16 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadSiteChildren(siteId);
   }
 
+  Future<void> _loadSiteSummaries(List<Site> sites) async {
+    final futures = sites
+        .where((s) => s.id != null && !_siteSummaries.containsKey(s.id))
+        .map((s) async {
+      final summary = await SessionDao.instance.getSiteSummary(s.id!);
+      _siteSummaries[s.id!] = summary;
+    });
+    await Future.wait(futures);
+  }
+
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
@@ -100,6 +125,15 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Besök'),
         actions: [
           IconButton(
+            icon: Icon(_viewMode == _HomeViewMode.tree
+                ? Icons.calendar_month_outlined
+                : Icons.account_tree_outlined),
+            tooltip: _viewMode == _HomeViewMode.tree
+                ? 'Visa per datum'
+                : 'Visa mappträd',
+            onPressed: _toggleViewMode,
+          ),
+          IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Inställningar',
             onPressed: () => _showSettings(context),
@@ -108,15 +142,254 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: provider.loading
           ? const Center(child: CircularProgressIndicator())
-          : _buildBody(provider),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddSheet(context),
-        child: const Icon(Icons.add),
+          : (_viewMode == _HomeViewMode.tree
+              ? _buildBody(provider)
+              : _buildDateView()),
+    );
+  }
+
+  Widget _inlineFab() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Center(
+        child: FloatingActionButton(
+          onPressed: () => _showAddSheet(context),
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }
 
+  void _toggleViewMode() {
+    setState(() {
+      _viewMode = _viewMode == _HomeViewMode.tree
+          ? _HomeViewMode.date
+          : _HomeViewMode.tree;
+    });
+    if (_viewMode == _HomeViewMode.date) {
+      _loadDateView();
+    }
+  }
+
+  Future<void> _loadDateView({bool force = false}) async {
+    if (_loadingDateView) return;
+    if (!force && _dateViewData != null) return;
+    setState(() => _loadingDateView = true);
+    final data = await SessionDao.instance.getAllSessionsForDateView();
+    if (!mounted) return;
+    setState(() {
+      _dateViewData = data;
+      _loadingDateView = false;
+    });
+  }
+
+  Widget _buildDateView() {
+    if (_loadingDateView || _dateViewData == null) {
+      if (!_loadingDateView) _loadDateView();
+      return const Center(child: CircularProgressIndicator());
+    }
+    final entries = _dateViewData!;
+    if (entries.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Inga besök än.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              FloatingActionButton(
+                onPressed: () => _showAddSheet(context),
+                child: const Icon(Icons.add),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Group by local date (YYYY-MM-DD).
+    final groups = <DateTime, List<SessionWithContext>>{};
+    for (final e in entries) {
+      final d = e.session.date;
+      final key = DateTime(d.year, d.month, d.day);
+      groups.putIfAbsent(key, () => []).add(e);
+    }
+    final sortedKeys = groups.keys.toList()
+      ..sort((a, b) => b.compareTo(a));
+
+    return ListView(
+      children: [
+        for (final dayKey in sortedKeys) ...[
+          _buildDayHeader(dayKey, groups[dayKey]!),
+          for (final e in groups[dayKey]!) _buildDateSessionTile(e),
+          const SizedBox(height: 8),
+        ],
+        _inlineFab(),
+      ],
+    );
+  }
+
+  Widget _buildDayHeader(
+      DateTime day, List<SessionWithContext> sessionsThatDay) {
+    final label = _dayHeaderFmt.format(day);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 4, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Alternativ för dagen',
+            onSelected: (v) {
+              if (v == 'exportDay') {
+                _exportDay(day, sessionsThatDay);
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'exportDay',
+                child: Text('Exportera dagens besök (kombinerad CSV)'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateSessionTile(SessionWithContext e) {
+    final session = e.session;
+    final startStr = _timeFmt.format(session.date);
+    final endStr = session.endTime != null
+        ? ' – ${_timeFmt.format(session.endTime!)}'
+        : '';
+    final crumbs = <String>[
+      ...e.breadcrumbFolders.map((f) => f.name),
+      if (e.site != null) e.site!.name,
+    ];
+    final breadcrumb = crumbs.isEmpty ? 'Lösa besök' : crumbs.join(' › ');
+
+    return ListTile(
+      leading: const Icon(Icons.list_alt_outlined),
+      title: Text(session.name),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$startStr$endStr'),
+          Text(
+            breadcrumb,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ),
+      isThreeLine: true,
+      trailing: PopupMenuButton<String>(
+        onSelected: (v) => _handleSessionMenu(v, session, e.site),
+        itemBuilder: (_) => const [
+          PopupMenuItem(value: 'export', child: Text('Exportera')),
+          PopupMenuItem(value: 'rename', child: Text('Ändra namn')),
+          PopupMenuItem(value: 'useAsTemplate', child: Text('Använd som mall')),
+          PopupMenuItem(value: 'move', child: Text('Flytta')),
+          PopupMenuItem(value: 'delete', child: Text('Ta bort')),
+        ],
+      ),
+      onTap: () => _openSession(session, e.site),
+    );
+  }
+
+  Future<void> _exportDay(
+      DateTime day, List<SessionWithContext> entries) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(
+      content: Text('Förbereder export…'),
+      duration: Duration(seconds: 30),
+    ));
+    try {
+      final csvEntries = <CombinedCsvEntry>[];
+      for (final e in entries) {
+        final observations =
+            await SessionDao.instance.getObservations(e.session.id!);
+        final actObs =
+            await SessionDao.instance.getActivityObservations(e.session.id!);
+        final nonZero = observations.where((o) =>
+                o.count > 0 ||
+                (actObs[o.taxonId]?.any((a) => a.count > 0) ?? false))
+            .toList();
+        if (nonZero.isEmpty) continue;
+        final taxonIds = nonZero.map((o) => o.taxonId).toList();
+        final taxa = {
+          for (final t in await TaxonDao.instance.getByIds(taxonIds))
+            t.taxonId: t,
+        };
+        final folderName = e.breadcrumbFolders.isNotEmpty
+            ? e.breadcrumbFolders.last.name
+            : null;
+        csvEntries.add(CombinedCsvEntry(
+          session: e.session,
+          observations: nonZero,
+          taxa: taxa,
+          activityObservations: actObs,
+          siteName: e.site?.name,
+          folderName: folderName,
+        ));
+      }
+      messenger.removeCurrentSnackBar();
+      if (csvEntries.isEmpty) {
+        if (mounted) {
+          messenger.showSnackBar(const SnackBar(
+            content: Text('Inga besök med observationer att exportera.'),
+          ));
+        }
+        return;
+      }
+      final csv = ExportService.instance.buildCombinedCsv(csvEntries);
+      final fileDate = DateFormat('yyyy-MM-dd').format(day);
+      final filename = 'BirdTally_$fileDate.csv';
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/$filename');
+      await file.writeAsString(csv);
+      if (mounted) {
+        await Share.shareXFiles(
+          [XFile(file.path, mimeType: 'text/csv')],
+          subject: 'BirdTally – $fileDate',
+        );
+      }
+    } catch (err) {
+      messenger.removeCurrentSnackBar();
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(err.toString())));
+      }
+    }
+  }
+
   Widget _buildBody(HomeProvider provider) {
+    // Eagerly load summaries for loose sites visible on the home screen.
+    if (provider.looseSites.isNotEmpty) {
+      final missing = provider.looseSites
+          .where((s) => s.id != null && !_siteSummaries.containsKey(s.id))
+          .toList();
+      if (missing.isNotEmpty) {
+        _loadSiteSummaries(missing).then((_) {
+          if (mounted) setState(() {});
+        });
+      }
+    }
+
     final hasContent = provider.folders.isNotEmpty ||
         provider.looseSites.isNotEmpty ||
         provider.looseSessions.isNotEmpty;
@@ -125,12 +398,22 @@ class _HomeScreenState extends State<HomeScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Text(
-            'Tryck på + för att skapa\nen mapp, lokal eller besök.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Tryck på + för att skapa\nen mapp, lokal eller besök.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              FloatingActionButton(
+                onPressed: () => _showAddSheet(context),
+                child: const Icon(Icons.add),
+              ),
+            ],
           ),
         ),
       );
@@ -151,6 +434,7 @@ class _HomeScreenState extends State<HomeScreen> {
           for (final session in provider.looseSessions)
             _buildSessionTile(session, 0, null),
         ],
+        _inlineFab(),
       ],
     );
   }
@@ -225,6 +509,19 @@ class _HomeScreenState extends State<HomeScreen> {
     final isLoading = _loadingNodes.contains('s$id');
     final sessions = _sessionsBySite[id];
     final hasLoadedChildren = sessions != null;
+    final summary = _siteSummaries[id];
+
+    String? subtitleText;
+    if (summary != null) {
+      final parts = <String>[];
+      if (summary.lastVisit != null) {
+        parts.add('Senast ${_dateFmt.format(summary.lastVisit!)}');
+      }
+      if (summary.speciesCount > 0) {
+        parts.add('${summary.speciesCount} arter');
+      }
+      if (parts.isNotEmpty) subtitleText = parts.join(' · ');
+    }
 
     return _IndentedTile(
       depth: depth,
@@ -236,6 +533,14 @@ class _HomeScreenState extends State<HomeScreen> {
               : null,
         ),
         title: Text(site.name),
+        subtitle: subtitleText != null
+            ? Text(
+                subtitleText,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              )
+            : null,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -379,8 +684,10 @@ class _HomeScreenState extends State<HomeScreen> {
         await _exportSession(context, session, site);
       case 'rename':
         await _renameSession(session, site);
+        _invalidateDateView();
       case 'useAsTemplate':
         await _createSessionFromTemplate(site, session);
+        _invalidateDateView();
       case 'move':
         final (sessionMoved, newSiteId) = await showMoveSessionDialog(context, session);
         if (!mounted || !sessionMoved) return;
@@ -390,8 +697,10 @@ class _HomeScreenState extends State<HomeScreen> {
         if (newSiteId != null && _sessionsBySite.containsKey(newSiteId)) {
           await _reloadSiteChildren(newSiteId);
         }
+        _invalidateDateView();
       case 'delete':
         await _confirmDeleteSession(session, site);
+        _invalidateDateView();
     }
   }
 
@@ -438,9 +747,22 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => TallyScreen(session: session)))
         .then((_) {
-      if (site != null && mounted) _reloadSiteChildren(site.id!);
+      // Invalidate summary so it refreshes with new data.
+      if (site != null && mounted) {
+        _siteSummaries.remove(site.id);
+        _reloadSiteChildren(site.id!);
+      }
       if (site == null && mounted) context.read<HomeProvider>().load();
+      _invalidateDateView();
     });
+  }
+
+  void _invalidateDateView() {
+    if (_viewMode == _HomeViewMode.date) {
+      _loadDateView(force: true);
+    } else {
+      _dateViewData = null;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -827,6 +1149,76 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _backupExport() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await BackupService.instance.export();
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Kunde inte exportera: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _backupRestore() async {
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Återställ databas'),
+        content: const Text(
+          'All nuvarande data ersätts med innehållet i den valda filen. '
+          'Appen startas om efter återställning.\n\n'
+          'Vill du fortsätta?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Avbryt'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Återställ'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await BackupService.instance.restore();
+
+    switch (result) {
+      case BackupRestoreResult.success:
+        if (mounted) {
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Återställd! Appen startas om…')),
+          );
+          // Reload home data from the restored database.
+          await AppDatabase.instance.appDb; // reopen
+          if (mounted) context.read<HomeProvider>().load();
+        }
+      case BackupRestoreResult.cancelled:
+        break;
+      case BackupRestoreResult.invalid:
+        if (mounted) {
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('Filen verkar inte vara en giltig BirdTally-databas.'),
+            ),
+          );
+        }
+      case BackupRestoreResult.error:
+        if (mounted) {
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Något gick fel vid återställning.')),
+          );
+        }
+    }
+  }
+
   Future<void> _exportSession(
       BuildContext context, Session session, Site? site) async {
     final siteName = site?.name;
@@ -968,11 +1360,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showSettings(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) => SafeArea(
         child: StatefulBuilder(
           builder: (ctx, setModalState) {
             final current = AppSettings.instance.coordSystem;
-            return Column(
+            return SingleChildScrollView(
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1014,7 +1408,34 @@ class _HomeScreenState extends State<HomeScreen> {
                     _exportAll();
                   },
                 ),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Text(
+                    'Säkerhetskopia (databas)',
+                    style: Theme.of(ctx).textTheme.titleMedium,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.save_outlined),
+                  title: const Text('Exportera säkerhetskopia'),
+                  subtitle: const Text('Spara hela databasen till valfri plats'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _backupExport();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.restore),
+                  title: const Text('Återställ från säkerhetskopia'),
+                  subtitle: const Text('Välj en .db-fil att återställa från'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _backupRestore();
+                  },
+                ),
               ],
+              ),
             );
           },
         ),
