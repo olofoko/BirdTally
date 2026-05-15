@@ -17,6 +17,8 @@ class ObservationRow extends StatelessWidget {
   final bool isChild;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
+  final VoidCallback? onLongPressAdd;
+  final VoidCallback? onCountTap;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final bool hasSubRows;
@@ -31,6 +33,8 @@ class ObservationRow extends StatelessWidget {
     required this.isChild,
     required this.onIncrement,
     required this.onDecrement,
+    this.onLongPressAdd,
+    this.onCountTap,
     this.onTap,
     this.onLongPress,
     this.hasSubRows = false,
@@ -105,6 +109,8 @@ class ObservationRow extends StatelessWidget {
               count: displayCount,
               onIncrement: onIncrement,
               onDecrement: onDecrement,
+              onLongPressAdd: onLongPressAdd,
+              onCountTap: onCountTap,
               small: isChild,
               multiplier: multiplier,
             ),
@@ -121,6 +127,8 @@ class TallyCounter extends StatelessWidget {
   final int count;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
+  final VoidCallback? onLongPressAdd;
+  final VoidCallback? onCountTap;
   final bool small;
   final int multiplier;
 
@@ -129,6 +137,8 @@ class TallyCounter extends StatelessWidget {
     required this.count,
     required this.onIncrement,
     required this.onDecrement,
+    this.onLongPressAdd,
+    this.onCountTap,
     this.small = false,
     this.multiplier = 1,
   });
@@ -180,13 +190,17 @@ class TallyCounter extends StatelessWidget {
         ),
         SizedBox(
           width: small ? 36 : 40,
-          child: Text(
-            '$count',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.w600,
-              fontFeatures: const [FontFeature.tabularFigures()],
+          child: InkWell(
+            onTap: onCountTap,
+            borderRadius: BorderRadius.circular(4),
+            child: Text(
+              '$count',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ),
@@ -199,6 +213,7 @@ class TallyCounter extends StatelessWidget {
             shape: const CircleBorder(),
             child: InkWell(
               onTap: onIncrement,
+              onLongPress: onLongPressAdd,
               customBorder: const CircleBorder(),
               child: Center(
                 child: Icon(

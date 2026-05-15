@@ -55,16 +55,10 @@ class TallyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Observations that are pinned (shown in Aktuell lista), sorted by sort_order.
-  List<Observation> get pinnedObservations {
-    final pinned = _observations.where((o) => o.isPinned).toList();
-    pinned.sort((a, b) {
-      final ta = _taxa[a.taxonId];
-      final tb = _taxa[b.taxonId];
-      return (ta?.sortOrder ?? 0).compareTo(tb?.sortOrder ?? 0);
-    });
-    return pinned;
-  }
+  /// Observations that are pinned (shown in Aktuell lista), in insertion order.
+  /// Sorting by the active SortMode is handled in _buildItems on the tally screen.
+  List<Observation> get pinnedObservations =>
+      _observations.where((o) => o.isPinned).toList();
 
   Taxon? taxonFor(int taxonId) => _taxa[taxonId];
 
@@ -170,32 +164,36 @@ class TallyProvider extends ChangeNotifier {
     return _adjustActivity(ao, -subRowMultiplierFor(ao.id ?? 0));
   }
 
-  Future<void> addActivity(int taxonId, String activity) async {
+  Future<void> addActivity(int taxonId, String activity,
+      {int initialCount = 1}) async {
     await _ensurePinned(taxonId);
     await _adjustActivity(
         ActivityObservation(
             sessionId: _session!.id!, taxonId: taxonId, activity: activity, count: 0),
-        1);
+        initialCount);
   }
 
-  Future<void> addStage(int taxonId, String stage) async {
+  Future<void> addStage(int taxonId, String stage,
+      {int initialCount = 1}) async {
     await _ensurePinned(taxonId);
     await _adjustActivity(
         ActivityObservation(
             sessionId: _session!.id!, taxonId: taxonId, stage: stage, count: 0),
-        1);
+        initialCount);
   }
 
-  Future<void> addGender(int taxonId, String gender) async {
+  Future<void> addGender(int taxonId, String gender,
+      {int initialCount = 1}) async {
     await _ensurePinned(taxonId);
     await _adjustActivity(
         ActivityObservation(
             sessionId: _session!.id!, taxonId: taxonId, gender: gender, count: 0),
-        1);
+        initialCount);
   }
 
   Future<void> addComments(
-      int taxonId, String commentPublic, String commentPrivate) async {
+      int taxonId, String commentPublic, String commentPrivate,
+      {int initialCount = 1}) async {
     await _ensurePinned(taxonId);
     await _adjustActivity(
         ActivityObservation(
@@ -205,7 +203,35 @@ class TallyProvider extends ChangeNotifier {
           commentPrivate: commentPrivate,
           count: 0,
         ),
-        1);
+        initialCount);
+  }
+
+  Future<void> addCount(int taxonId, int amount) async {
+    if (amount <= 0) return;
+    await _adjust(taxonId, amount, pin: true);
+  }
+
+  Future<void> setCount(int taxonId, int n) async {
+    final delta = n.clamp(0, 9999) - countFor(taxonId);
+    if (delta == 0) return;
+    await _adjust(taxonId, delta, pin: true);
+  }
+
+  Future<void> addActivityCount(ActivityObservation ao, int amount) async {
+    if (amount <= 0) return;
+    await _adjustActivity(_freshSubRow(ao), amount);
+  }
+
+  Future<void> setActivityCount(ActivityObservation ao, int n) async {
+    final fresh = _freshSubRow(ao);
+    final delta = n.clamp(0, 9999) - fresh.count;
+    if (delta == 0) return;
+    await _adjustActivity(fresh, delta);
+  }
+
+  Future<void> resetOwnCount(int taxonId) async {
+    final existing = countFor(taxonId);
+    if (existing > 0) await _adjust(taxonId, -existing);
   }
 
   Future<void> setActivityOnSubRow(ActivityObservation ao, String activity) async {

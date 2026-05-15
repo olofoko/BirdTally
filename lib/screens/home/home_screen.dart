@@ -312,6 +312,58 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Combined CSV export helpers
+  // ---------------------------------------------------------------------------
+
+  /// Loads one session's observations and builds a [CombinedCsvEntry].
+  /// Returns null if the session has no non-zero observations.
+  Future<CombinedCsvEntry?> _buildCsvEntry(
+      Session session, {String? siteName, String? folderName}) async {
+    final observations =
+        await SessionDao.instance.getObservations(session.id!);
+    final actObs =
+        await SessionDao.instance.getActivityObservations(session.id!);
+    final nonZero = observations
+        .where((o) =>
+            o.count > 0 ||
+            (actObs[o.taxonId]?.any((a) => a.count > 0) ?? false))
+        .toList();
+    if (nonZero.isEmpty) return null;
+    final taxa = {
+      for (final t in await TaxonDao.instance
+          .getByIds(nonZero.map((o) => o.taxonId).toList()))
+        t.taxonId: t,
+    };
+    return CombinedCsvEntry(
+      session: session,
+      observations: nonZero,
+      taxa: taxa,
+      activityObservations: actObs,
+      siteName: siteName,
+      folderName: folderName,
+    );
+  }
+
+  /// Recursively collects [CombinedCsvEntry] for every session under [folder].
+  Future<void> _gatherFolderEntries(
+      Folder folder, List<CombinedCsvEntry> out) async {
+    final sites = await SessionDao.instance.getSites(folderId: folder.id);
+    for (final site in sites) {
+      final sessions = await SessionDao.instance.getSessions(siteId: site.id);
+      for (final session in sessions) {
+        final entry = await _buildCsvEntry(session,
+            siteName: site.name, folderName: folder.name);
+        if (entry != null) out.add(entry);
+      }
+    }
+    final subs =
+        await SessionDao.instance.getFolders(parentFolderId: folder.id);
+    for (final sub in subs) {
+      await _gatherFolderEntries(sub, out);
+    }
+  }
+
   Future<void> _exportDay(
       DateTime day, List<SessionWithContext> entries) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -322,58 +374,104 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final csvEntries = <CombinedCsvEntry>[];
       for (final e in entries) {
-        final observations =
-            await SessionDao.instance.getObservations(e.session.id!);
-        final actObs =
-            await SessionDao.instance.getActivityObservations(e.session.id!);
-        final nonZero = observations.where((o) =>
-                o.count > 0 ||
-                (actObs[o.taxonId]?.any((a) => a.count > 0) ?? false))
-            .toList();
-        if (nonZero.isEmpty) continue;
-        final taxonIds = nonZero.map((o) => o.taxonId).toList();
-        final taxa = {
-          for (final t in await TaxonDao.instance.getByIds(taxonIds))
-            t.taxonId: t,
-        };
         final folderName = e.breadcrumbFolders.isNotEmpty
             ? e.breadcrumbFolders.last.name
             : null;
-        csvEntries.add(CombinedCsvEntry(
-          session: e.session,
-          observations: nonZero,
-          taxa: taxa,
-          activityObservations: actObs,
-          siteName: e.site?.name,
-          folderName: folderName,
-        ));
+        final entry = await _buildCsvEntry(e.session,
+            siteName: e.site?.name, folderName: folderName);
+        if (entry != null) csvEntries.add(entry);
       }
-      messenger.removeCurrentSnackBar();
-      if (csvEntries.isEmpty) {
-        if (mounted) {
-          messenger.showSnackBar(const SnackBar(
-            content: Text('Inga besök med observationer att exportera.'),
-          ));
-        }
-        return;
-      }
-      final csv = ExportService.instance.buildCombinedCsv(csvEntries);
-      final fileDate = DateFormat('yyyy-MM-dd').format(day);
-      final filename = 'BirdTally_$fileDate.csv';
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/$filename');
-      await file.writeAsString(csv);
-      if (mounted) {
-        await Share.shareXFiles(
-          [XFile(file.path, mimeType: 'text/csv')],
-          subject: 'BirdTally – $fileDate',
-        );
-      }
+      await _shareCombinedCsv(
+        messenger,
+        csvEntries,
+        filename: 'BirdTally_${DateFormat('yyyy-MM-dd').format(day)}.csv',
+        subject: 'BirdTally – ${DateFormat('yyyy-MM-dd').format(day)}',
+      );
     } catch (err) {
       messenger.removeCurrentSnackBar();
       if (mounted) {
         messenger.showSnackBar(SnackBar(content: Text(err.toString())));
       }
+    }
+  }
+
+  Future<void> _exportSiteCombined(Site site, Folder? parentFolder) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(
+      content: Text('Förbereder export…'),
+      duration: Duration(seconds: 30),
+    ));
+    try {
+      final sessions = await SessionDao.instance.getSessions(siteId: site.id);
+      final csvEntries = <CombinedCsvEntry>[];
+      for (final session in sessions) {
+        final entry = await _buildCsvEntry(session,
+            siteName: site.name, folderName: parentFolder?.name);
+        if (entry != null) csvEntries.add(entry);
+      }
+      final safe = ExportService.sanitizeFilename(site.name);
+      await _shareCombinedCsv(
+        messenger,
+        csvEntries,
+        filename: 'BirdTally_$safe.csv',
+        subject: 'BirdTally – ${site.name}',
+      );
+    } catch (err) {
+      messenger.removeCurrentSnackBar();
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(err.toString())));
+      }
+    }
+  }
+
+  Future<void> _exportFolderCombined(Folder folder) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(
+      content: Text('Förbereder export…'),
+      duration: Duration(seconds: 30),
+    ));
+    try {
+      final csvEntries = <CombinedCsvEntry>[];
+      await _gatherFolderEntries(folder, csvEntries);
+      final safe = ExportService.sanitizeFilename(folder.name);
+      await _shareCombinedCsv(
+        messenger,
+        csvEntries,
+        filename: 'BirdTally_$safe.csv',
+        subject: 'BirdTally – ${folder.name}',
+      );
+    } catch (err) {
+      messenger.removeCurrentSnackBar();
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(err.toString())));
+      }
+    }
+  }
+
+  Future<void> _shareCombinedCsv(
+    ScaffoldMessengerState messenger,
+    List<CombinedCsvEntry> entries, {
+    required String filename,
+    required String subject,
+  }) async {
+    messenger.removeCurrentSnackBar();
+    if (entries.isEmpty) {
+      if (mounted) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Inga besök med observationer att exportera.'),
+        ));
+      }
+      return;
+    }
+    final csv = ExportService.instance.buildCombinedCsv(entries);
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/$filename');
+    await file.writeAsString(csv);
+    if (mounted) {
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'text/csv')],
+        subject: subject,
+      );
     }
   }
 
@@ -475,7 +573,8 @@ class _HomeScreenState extends State<HomeScreen> {
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'addSite', child: Text('Ny lokal')),
                 PopupMenuItem(value: 'addSubFolder', child: Text('Ny undermapp')),
-                PopupMenuItem(value: 'export', child: Text('Exportera mapp')),
+                PopupMenuItem(value: 'exportCombined', child: Text('Exportera mapp (kombinerad CSV)')),
+                PopupMenuItem(value: 'export', child: Text('Exportera mapp (zip)')),
                 PopupMenuItem(value: 'move', child: Text('Flytta')),
                 PopupMenuItem(value: 'rename', child: Text('Byt namn')),
                 PopupMenuItem(value: 'delete', child: Text('Ta bort')),
@@ -549,7 +648,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   _handleSiteMenu(v, site, parentFolder),
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'addSession', child: Text('Nytt besök')),
-                PopupMenuItem(value: 'export', child: Text('Exportera lokal')),
+                PopupMenuItem(value: 'exportCombined', child: Text('Exportera lokal (kombinerad CSV)')),
+                PopupMenuItem(value: 'export', child: Text('Exportera lokal (zip)')),
                 PopupMenuItem(value: 'rename', child: Text('Ändra namn')),
                 PopupMenuItem(value: 'location', child: Text('Redigera plats')),
                 PopupMenuItem(value: 'move', child: Text('Flytta')),
@@ -631,6 +731,8 @@ class _HomeScreenState extends State<HomeScreen> {
         await _createSiteInFolder(folder);
       case 'addSubFolder':
         await _createSubFolder(folder);
+      case 'exportCombined':
+        await _exportFolderCombined(folder);
       case 'export':
         await _exportFolder(folder);
       case 'move':
@@ -657,6 +759,8 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (action) {
       case 'addSession':
         await _createSessionInSite(site, parentFolder);
+      case 'exportCombined':
+        await _exportSiteCombined(site, parentFolder);
       case 'export':
         await _exportSite(site, parentFolder);
       case 'rename':

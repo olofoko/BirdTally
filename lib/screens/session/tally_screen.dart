@@ -438,6 +438,10 @@ class _TallyListState extends State<_TallyList> {
         isChild: item.isChild,
         onIncrement: () => provider.increment(taxon.taxonId),
         onDecrement: () => provider.decrement(taxon.taxonId),
+        onLongPressAdd: () => _promptCustomAdd(
+            context, (n) => provider.addCount(taxon.taxonId, n)),
+        onCountTap: () => _promptSetCount(context, ownCount,
+            (n) => provider.setCount(taxon.taxonId, n)),
         onTap: hasSubRows
             ? () => _toggleCollapse(taxon.taxonId)
             : () => _showTaxonOptions(context, provider, taxon),
@@ -456,6 +460,10 @@ class _TallyListState extends State<_TallyList> {
             multiplier: provider.subRowMultiplierFor(ao.id ?? 0),
             onIncrement: () => provider.incrementActivity(ao),
             onDecrement: () => provider.decrementActivity(ao),
+            onLongPressAdd: () => _promptCustomAdd(
+                context, (n) => provider.addActivityCount(ao, n)),
+            onCountTap: () => _promptSetCount(context, ao.count,
+                (n) => provider.setActivityCount(ao, n)),
             onTap: () => _showSubRowOptions(context, provider, ao),
           ));
         }
@@ -770,11 +778,108 @@ class _TallyListState extends State<_TallyList> {
       title: 'Välj aktivitet',
       values: kActivities,
       isAlreadyAdded: (v) => existing.contains(v),
-      onSelected: (v) async {
-        await provider.addActivity(taxon.taxonId, v);
-        if (context.mounted) _maybeShowSubRowSnackbar(context, provider);
-      },
+      onSelected: (v) => _addSubRowWithTransfer(context, provider, taxon,
+          (n) => provider.addActivity(taxon.taxonId, v, initialCount: n)),
     );
+  }
+
+  /// Runs the UX17 transfer prompt and invokes [addSubRow] with the chosen
+  /// initial count. If the user chose to transfer, also zeroes the own count
+  /// so the total is preserved. Null return means the user cancelled.
+  Future<void> _addSubRowWithTransfer(
+      BuildContext context,
+      TallyProvider provider,
+      Taxon taxon,
+      Future<void> Function(int initialCount) addSubRow) async {
+    final transfer = await _maybePromptTransfer(context, provider, taxon);
+    if (transfer == null) return;
+    await addSubRow(transfer);
+    if (transfer > 1) await provider.resetOwnCount(taxon.taxonId);
+    if (context.mounted) _maybeShowSubRowSnackbar(context, provider);
+  }
+
+  /// Returns the count the new sub-row should start at:
+  /// - null: user cancelled the transfer prompt (skip add entirely).
+  /// - 1:    no existing count, or user chose "Nej" (default behaviour).
+  /// - N>1:  user chose "Ja, flytta" — transfer the existing count.
+  Future<int?> _maybePromptTransfer(
+      BuildContext context, TallyProvider provider, Taxon taxon) async {
+    final ownCount = provider.countFor(taxon.taxonId);
+    if (ownCount <= 0) return 1;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Flytta räkningen?'),
+        content: Text(
+            'Ska detta gälla redan räknade $ownCount ${ownCount == 1 ? "fågel" : "fåglar"}?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Avbryt')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Nej')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Ja, flytta')),
+        ],
+      ),
+    );
+    if (result == null) return null;
+    return result ? ownCount : 1;
+  }
+
+  Future<void> _promptCustomAdd(
+      BuildContext context, Future<void> Function(int) add) async {
+    final n = await _askCount(context, title: 'Lägg till antal');
+    if (n == null || n <= 0) return;
+    await add(n);
+  }
+
+  Future<void> _promptSetCount(
+      BuildContext context, int current, Future<void> Function(int) set) async {
+    final n = await _askCount(context,
+        title: 'Ange antal', initialValue: current, minValue: 0);
+    if (n == null) return;
+    await set(n);
+  }
+
+  Future<int?> _askCount(BuildContext context,
+      {required String title, int? initialValue, int minValue = 1}) async {
+    final controller = TextEditingController(
+        text: initialValue != null ? '$initialValue' : '');
+    try {
+      return await showDialog<int>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(hintText: 'Antal'),
+            onSubmitted: (v) {
+              final n = int.tryParse(v.trim());
+              if (n != null && n >= minValue) Navigator.pop(ctx, n);
+            },
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Avbryt')),
+            TextButton(
+              onPressed: () {
+                final n = int.tryParse(controller.text.trim());
+                if (n != null && n >= minValue) Navigator.pop(ctx, n);
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
   void _maybeShowSubRowSnackbar(BuildContext context, TallyProvider provider) {
@@ -810,8 +915,8 @@ class _TallyListState extends State<_TallyList> {
         if (ao != null) {
           await provider.setStageOnSubRow(ao, v);
         } else {
-          await provider.addStage(taxon!.taxonId, v);
-          if (context.mounted) _maybeShowSubRowSnackbar(context, provider);
+          await _addSubRowWithTransfer(context, provider, taxon!,
+              (n) => provider.addStage(taxon.taxonId, v, initialCount: n));
         }
       },
     );
@@ -836,9 +941,13 @@ class _TallyListState extends State<_TallyList> {
           ao, result.commentPublic, result.commentPrivate);
     } else if (taxon != null) {
       if (result.commentPublic.isEmpty && result.commentPrivate.isEmpty) return;
-      await provider.addComments(
-          taxon.taxonId, result.commentPublic, result.commentPrivate);
-      if (context.mounted) _maybeShowSubRowSnackbar(context, provider);
+      if (!context.mounted) return;
+      await _addSubRowWithTransfer(
+          context,
+          provider,
+          taxon,
+          (n) => provider.addComments(taxon.taxonId, result.commentPublic,
+              result.commentPrivate, initialCount: n));
     }
   }
 
@@ -853,8 +962,8 @@ class _TallyListState extends State<_TallyList> {
         if (ao != null) {
           await provider.setGenderOnSubRow(ao, v);
         } else {
-          await provider.addGender(taxon!.taxonId, v);
-          if (context.mounted) _maybeShowSubRowSnackbar(context, provider);
+          await _addSubRowWithTransfer(context, provider, taxon!,
+              (n) => provider.addGender(taxon.taxonId, v, initialCount: n));
         }
       },
     );
@@ -1058,6 +1167,8 @@ class _ActivityRow extends StatefulWidget {
   final int multiplier;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
+  final VoidCallback? onLongPressAdd;
+  final VoidCallback? onCountTap;
   final VoidCallback onTap;
 
   const _ActivityRow({
@@ -1065,6 +1176,8 @@ class _ActivityRow extends StatefulWidget {
     this.multiplier = 1,
     required this.onIncrement,
     required this.onDecrement,
+    this.onLongPressAdd,
+    this.onCountTap,
     required this.onTap,
   });
 
@@ -1143,6 +1256,8 @@ class _ActivityRowState extends State<_ActivityRow> {
                 count: ao.count,
                 onIncrement: widget.onIncrement,
                 onDecrement: widget.onDecrement,
+                onLongPressAdd: widget.onLongPressAdd,
+                onCountTap: widget.onCountTap,
                 small: true,
                 multiplier: widget.multiplier,
               ),

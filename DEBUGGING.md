@@ -222,6 +222,12 @@ Lägg till en toggle under kugghjulet på hemskärmen: **"Visa hjälptexter — 
 
 Persisteras via `SharedPreferences` / `AppSettings`. Användbart för vana användare som vill ha ett rent UI utan instruktioner.
 
+### UX16 - Long press the (+) button for adding custom number of birds to tally
+Long press should trigger a small popup with numeric input on how many birds to add to the tally. Should work for both rows and subrows.
+
+### UX17 - Option to transfer tally count to subrows
+If a user has counted a number of birds witout adding subrows, an option should be availble when adding a subrow to transfer already counted birds to the subrow. Or in plain terms, assign any of the subrow attributes to already counted birds. So when e.g. an activity has been choosen, adding a prompt that asks "Ska detta gälla redan räknade fåglar?" with Ja/Nej as options. Ja > transfers the count to the new subrow. No > No transfer, a new subrow with the count 0 is created.
+
 ---
 
 ## Feature wish list
