@@ -45,6 +45,14 @@ class _HomeScreenState extends State<HomeScreen> {
   final Map<int, SiteSummary> _siteSummaries = {};
   final Set<String> _loadingNodes = {};
 
+  /// Returns the center of the screen as a Rect — required by iOS share sheet.
+  Rect get _shareOrigin {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null) return Rect.zero;
+    final size = box.size;
+    return Rect.fromLTWH(size.width / 2, size.height / 2, 1, 1);
+  }
+
   _HomeViewMode _viewMode = _HomeViewMode.tree;
   List<SessionWithContext>? _dateViewData;
   bool _loadingDateView = false;
@@ -471,6 +479,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'text/csv')],
         subject: subject,
+        sharePositionOrigin: _shareOrigin,
       );
     }
   }
@@ -1196,6 +1205,7 @@ class _HomeScreenState extends State<HomeScreen> {
         await Share.shareXFiles(
           [XFile(path, mimeType: 'application/zip')],
           subject: 'BirdTally – ${folder.name}',
+          sharePositionOrigin: _shareOrigin,
         );
       }
     } catch (e) {
@@ -1221,6 +1231,7 @@ class _HomeScreenState extends State<HomeScreen> {
         await Share.shareXFiles(
           [XFile(path, mimeType: 'application/zip')],
           subject: 'BirdTally – ${site.name}',
+          sharePositionOrigin: _shareOrigin,
         );
       }
     } catch (e) {
@@ -1243,6 +1254,7 @@ class _HomeScreenState extends State<HomeScreen> {
         await Share.shareXFiles(
           [XFile(path, mimeType: 'application/zip')],
           subject: 'BirdTally Backup',
+          sharePositionOrigin: _shareOrigin,
         );
       }
     } catch (e) {
@@ -1406,6 +1418,7 @@ class _HomeScreenState extends State<HomeScreen> {
         await Share.shareXFiles(
           [XFile(file.path, mimeType: 'text/csv')],
           subject: 'BirdTally – $name',
+          sharePositionOrigin: _shareOrigin,
         );
       }
     }
